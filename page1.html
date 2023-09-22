@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="static/css/main.css" <title>Глава 1</title>
+</head>
+
+<body>
+    <h1>Создание вашего первого сервера в Go</h1>
+
+    <ul>В этой главе мы рассмотрим следующие рецепты:
+        <li>Создание простого HTTP-сервера.</li>
+        <li>Реализация базовой аутентификации на простом HTTP-сервере.</li>
+        <li>Оптимизация ответов HTTP-сервера с помощью сжатия GZIP.</li>
+        <li>Создание простого TCP-сервера.</li>
+        <li>Чтение данных из TCP-соединения.</li>
+        <li>Запись данных. к TCP-соединению.</li>
+        <li>Реализация маршрутизации HTTP-запросов.</li>
+        <li>Реализация маршрутизации HTTP-запросов с использованием Gorilla Mux.</li>
+        <li>Регистрация HTTP-запросов.</li>
+    </ul>
+
+    <h2>Создание простого HTTP-сервера</h2>
+
+    <p>Как программист, если вам нужно создать простой HTTP-сервер, вы можете легко
+        написать его, используя пакет Go net/http, который мы рассмотрим в этом рецепте.</p>
+
+    <h3>Как это сделать…</h3>
+    <p>В этом рецепте мы собираемся создать простой HTTP-сервер, который будет отображать Hello
+        World! когда мы просматриваем http://localhost:8080 или выполняем команду curl http://localhost:8080 из
+        командной строки. Выполните следующие шаги:</p>
+    <ol>
+        <li>Создайте http-server.go и скопируйте следующий контент:</li>
+        <pre><code>
+    package main
+    
+    import (
+        "fmt"
+        "log"
+        "net/http"
+    )
+    
+    const (
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+    
+    func helloWorld(w http.ResponseWriter, r *http.Request){
+        fmt.Fprintf(w, "Hello World!")
+    }
+
+    func main(){
+        http.HandleFunc("/", helloWorld)
+        err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, nil)
+        if err != nil{
+            log.Fatal("ошибка при запуске http-сервера : ", err)
+            return
+        }
+    }
+    </code></pre>
+        <li>Запустите программу следующей командой:</li>
+        <p class="terminal">
+            $ go run http-server.go
+        </p>
+    </ol>
+    <h3>Как это работает…</h3>
+    <p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.
+        При открытии <span>http://localhost:8080</span> в браузере отобразится сообщение Hello World! с сервера, как
+        показано на следующем снимке экрана:</p>
+    <p><img src="static/images/picture1-1.png" /></p>
+    <ul>Давайте разберемся, что означает каждая строка в программе:
+        <li><i>package main</i>: определяет имя пакета программы.</li>
+        <li><i>import( "fmt" "log" "net/http" )</i>: это команда препроцессора, которая сообщает компилятору Go
+            включить все файлы из fmt, log и пакета net/http.</li>
+        <li><i>const (CONN_HOST = «localhost» CONN_PORT = «8080»)</i>: мы объявляем константы в
+            программе Go, используя ключевое слово const. Здесь мы объявили две константы: одна —
+            CONN_HOST со значением localhost, а другая — CONN_PORT со значением 8080.</li>
+        <li><i>func helloWorld(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "Hello World!") }</i>:
+            это функция Go, которая принимает ResponseWriter и Request в качестве входных данных и записывает
+            Hello World! в потоке ответов HTTP.</li>
+    </ul>
+    <ul>Далее мы объявили метод <i>main()</i>, с которого начинается выполнение программы, так как этот
+        метод делает много вещей. Давайте разберемся в этом построчно:
+        <li><i>http.HandleFunc("/", helloWorld)</i>: здесь мы регистрируем функцию helloWorld с
+            шаблоном / URL, используя HandleFunc пакета net/http, что означает
+            выполнение helloWorld с передачей (http.ResponseWriter, *http.Request) в качестве параметра всякий
+            раз, когда мы обращаемся к URL-адресу HTTP с шаблоном /.</li>
+        <li><i>err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)</i>: Здесь мы вызываем
+            http.ListenAndServe для обслуживания HTTP-запросов, которые обрабатывают каждое входящее соединение
+            в отдельной Goroutine. ListenAndServe принимает два параметра — адрес сервера и
+            обработчик. Здесь мы передаем адрес сервера как localhost:8080 и обработчик как
+            nil, что означает, что мы просим сервер использовать DefaultServeMux в качестве обработчика.</li>
+        <li><i>if err != nil { log.Fatal("ошибка запуска http-сервера: ", err) return}</i>: Здесь мы проверяем,
+            есть ли проблемы с запуском сервера. Если да, зарегистрируйте ошибку и
+            выйдите с кодом состояния 1.</li>
+    </ul>
+
+    <h2>Реализация базовой аутентификации на простом HTTP-сервере</h2>
+    <p>После создания HTTP-сервера вы, вероятно, захотите ограничить
+        доступ к ресурсам определенного пользователя, например администратора приложения. Если
+        да, то вы можете реализовать базовую аутентификацию на HTTP-сервере, которую мы рассмотрим
+        в этом рецепте.</p>
+    <h3>Как это сделать…</h3>
+    <p>Поскольку в предыдущем рецепте мы уже создали HTTP-сервер, мы просто расширим
+        его, включив в него базовую аутентификацию.</p>
+    <p>В этом рецепте мы собираемся обновить HTTP-сервер, созданный в предыдущем
+        рецепте, добавив функцию BasicAuth и изменив HandleFunc для ее вызова. Выполните
+        следующие шаги:</p>
+    <ol>
+        <li>Создайте <i>http-server-basic-authentication.go</i> и скопируйте следующий контент:</li>
+        <pre><code>
+    package main
+
+    import (
+        "crypto/subtle"
+        "fmt"
+        "log"
+        "net/http"
+    )
+
+    const (
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+        ADMIN_USER = "admin"
+        ADMIN_PASSWORD = "admin"
+    )
+
+    func helloWorld(w http.ResponseWriter, r *http.Request){
+        fmt.Fprintf(w, "Hello World!")
+    }
+
+    func BasicAuth(handler http.HandlerFunc, realm string) http.HandlerFunc {
+        return func(w http.ResponseWriter, r *http.Request){
+            user, pass, ok := r.BasicAuth()
+            if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(ADMIN_USER)) != 1
+                   || subtle.ConstantTimeCompare([]byte(pass), []byte(ADMIN_PASSWORD)) != 1 {
+                w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
+                w.WriteHeader(401)
+                w.Write([]byte("Вы не авторизованы для доступа к приложению.\n"))
+                return
+            }
+            handler(w, r)
+        }
+    }
+
+    func main(){
+        http.HandleFunc("/", BasicAuth(helloWorld, "Пожалуйста введите свой логин и пароль"))
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)
+        if err != nil {
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+    </code></pre>
+        <li>Запустите программу следующей командой:</li>
+        <p class="terminal">
+            $ go run http-server-basic-authentication.go
+        </p>
+    </ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>После запуска сервера при доступе к <span>http://localhost:8080</span> в браузере вам будет предложено ввести
+    имя пользователя и пароль. Предоставив его от имени администратора, администратор соответственно отобразит
+    Hello World! на экране, и для любой другой комбинации имени пользователя и
+    пароля будет отображаться сообщение «Вы не авторизованы для доступа к приложению».</p>
+<p>Чтобы получить доступ к серверу из командной строки, мы должны указать флаг --user как часть
+    команды Curl, как показано ниже:</p>
+<p class="terminal">
+    $ curl --user admin:admin http://localhost:8080/
+    
+    Hello World!
+</p>
+<p>Мы также можем получить доступ к серверу, используя токен имени пользователя:пароля в кодировке Base64, который
+    мы можем получить с любого веб-сайта, например <span>https://www.base64encode.org/</span>, и передать его в качестве
+    заголовка авторизации в команде Curl, как следует:
+</p>
+<p class="terminal">
+    $ curl -i -H 'Authorization:Basic YWRtaW46YWRtaW4=' http://localhost:8080/
+    
+    HTTP/1.1 200 OK
+    Date: Sat, 12 Aug 2017 12:02:51 GMT
+    Content-Length: 12
+    Content-Type: text/plain; charset=utf-8
+    Hello World!
+</p>
+<ul>Давайте разберемся с изменениями, которые мы внесли в этот рецепт:
+    <li>Функция импорта добавляет дополнительный пакет <i>crypto/subtle</i>, который мы будем использовать для
+        сравнения имени пользователя и пароля с введенными учетными данными пользователя.</li>
+    <li>С помощью функции const мы определили две дополнительные константы: <i>ADMIN_USER</i> и
+        <i>ADMIN_PASSWORD</i>, которые мы будем использовать при аутентификации пользователя.</li>
+    <li>Далее мы объявили метод <i>BasicAuth()</i>, который принимает два входных параметра —
+        обработчик, который выполняется после успешной аутентификации пользователя, и строку.
+        Этот метод возвращает функцию HandlerFunc, следующим образом:</li>
+        <pre><code>
+func BasicAuth(handler http.HandlerFunc, realm string) http.HandlerFunc{
+    return func(w http.ResponseWriter, r *http.Request){
+        user, pass, ok := r.BasicAuth()
+        if !ok || subtle.ConstantTimeCompare([]byte(user),[]byte(ADMIN_USER)) != 1
+               ||subtle.ConstantTimeCompare([]byte(pass),[]byte(ADMIN_PASSWORD)) != 1{
+            w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
+            w.WriteHeader(401)
+            w.Write([]byte("Unauthorized.\n"))
+            return
+        }
+        handler(w, r)
+    }
+}
+        </code></pre>
+</ul>
+<p>В предыдущем обработчике мы сначала получаем имя пользователя и пароль, указанные в
+    заголовке авторизации запроса, с помощью r.BasicAuth(), а затем сравниваем их с
+    константами, объявленными в программе. Если учетные данные совпадают, он возвращает
+    обработчик, в противном случае он устанавливает WWW-Authenticate вместе с кодом состояния 401 и
+    пишет: «Вы не авторизованы для доступа к приложению» в потоке ответов HTTP.</p>
+<p>Наконец, мы внесли изменение в метод main() для вызова BasicAuth из
+    HandleFunc следующим образом:
+<i>http.HandleFunc("/", BasicAuth(helloWorld, "Пожалуйста введите свой логин и пароль"))
+</i></p>
+<p>Мы просто передаем обработчик BasicAuth вместо nil или DefaultServeMux для обработки всех
+    входящих запросов с шаблоном URL как /.</p>
+
+<h2>Оптимизация ответов HTTP-сервера с помощью сжатия GZIP</h2>
+<p>Сжатие GZIP означает отправку ответа клиенту с сервера в
+    формате .gzip, а не отправку простого ответа, и всегда полезно отправлять
+    сжатые ответы, если клиент/браузер поддерживает это.</p>
+<p>Отправляя сжатый ответ, мы экономим пропускную способность сети и время загрузки, что
+    в конечном итоге ускоряет обработку страницы. При сжатии GZIP браузер
+    отправляет заголовок запроса, сообщая серверу, что он принимает сжатый контент (.gzip
+    и .deflate), и если у сервера есть возможность отправить ответ в сжатой
+    форме, он отправляет его. Если сервер поддерживает сжатие, он устанавливает Content-Encoding: gzip
+    в качестве заголовка ответа, в противном случае он отправляет простой ответ обратно клиенту, что
+    явно означает, что запрос сжатого ответа — это всего лишь запрос браузера, а
+    не требование. Для реализации этого рецепта мы будем использовать пакет обработчиков Gorilla</p>
+
+    <h3>Как это сделать ...</h3>
+<p>В этом рецепте мы собираемся создать HTTP-сервер с одним обработчиком, который будет
+    писать Hello World! в потоке ответов HTTP и используйте Gorilla CompressHandler для
+    отправки всех ответов обратно клиенту в формате .gzip. Выполните следующие
+    шаги:</p>
+
+<ol>
+    <li>Чтобы использовать обработчики Gorilla, сначала нам нужно установить пакет с помощью
+        команды go get или скопировать его вручную в $GOPATH/src или $GOPATH, как показано ниже:</li>
+    <p class="terminal">
+        $ go get github.com/gorilla/handlers
+    </p>
+    <li>Создайте http-server-mux.go и скопируйте следующий контент:</li>
+<pre><code>
+package main
+
+import (
+    "io"
+    "net/http"
+    "github.com/gorilla/handlers"
+)
+
+const (
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+)
+
+func helloWorld(w http.ResponseWriter, r *http.Request){
+    io.WriteString(w, "Hello World!")
+}
+
+func main(){
+    mux := http.NewServeMux()
+    mux.HandleFunc("/", helloWorld)
+    err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT,
+    handlers.CompressHandler(mux))
+
+    if err != nil{
+        log.Fatal("ошибка при запуске http-сервера : ", err)
+        return
+    }
+}
+    </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run http-server-mux.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт <i>8080</i>.</p>
+<p>Открытие <span>http://localhost:8080</span> в браузере отобразит Hello World! с сервера
+    со значением заголовка ответа Content-Encoding gzip, как показано на следующем
+    снимке экрана:</p>
+<p><img src="static/images/picture1-2.png"/></p>
+
+<ul>Давайте разберемся, что означает каждая строка в программе:
+    <li><i>package main</i>: определяет имя пакета программы.</li>
+    <li><i>import ( "io" "net/http" "github.com/gorilla/handlers")</i>: это команда препроцессора
+        , которая сообщает компилятору Go включить все файлы из io, net/http и github.com/gorilla/
+        . пакет обработчиков.</li>
+    <li><i>const (CONN_HOST = «localhost» CONN_PORT = «8080»</i>): мы объявляем константы в
+        программе Go, используя ключевое слово const. Здесь мы объявили две константы: одна —
+        CONN_HOST со значением localhost, а другая — CONN_PORT со значением 8080.</li>
+    <li><i>func helloWorld(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "Hello
+        World!")}</i>: это функция Go, которая принимает ResponseWriter и Request в качестве входных
+        параметров и записывает Hello World! в потоке ответов HTTP.</li>
+</ul>
+<ul>
+    <li>Далее мы объявили метод <i>main()</i>, с которого начинается выполнение программы. Поскольку этот
+        метод делает много вещей, давайте разберемся в нем построчно:</li>
+    <li><i>mux := http.NewServeMux()</i>: выделяет и возвращает новый
+        мультиплексор HTTP-запросов (ServeMux), который сопоставляет URL-адрес каждого входящего запроса со списком
+        зарегистрированных шаблонов и вызывает обработчик шаблона, который наиболее точно
+        соответствует URL-адресу. Одним из преимуществ его использования является то, что программа имеет полный
+        контроль над обработчиками, используемыми с сервером, хотя любые обработчики, зарегистрированные
+        в DefaultServeMux, игнорируются.</li>
+    <li><i>http.HandleFunc("/", helloWorld)</i>: здесь мы регистрируем функцию helloWorld с
+        шаблоном / URL, используя HandleFunc пакета net/http, что означает
+        выполнение helloWorld с передачей (http.ResponseWriter, *http.Request) в качестве параметра всякий
+        раз, когда мы обращаемся к URL-адресу HTTP с помощью шаблона /.</li>
+    <li><i>err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, handlers.CompressHandler(mux))</i>: Здесь
+        мы вызываем http.ListenAndServe для обслуживания HTTP-запросов, которые обрабатывают каждое
+        входящее соединение в отдельной Goroutine для нас. ListenAndServe принимает два
+        параметра — адрес сервера и обработчик. Здесь мы передаем адрес сервера
+        как localhost:8080 и обработчик как CompressHandler, который оборачивает наш сервер обработчиком .gzip
+        для сжатия всех ответов в формате .gzip.</li>
+    <li><i>if err != nil { log.Fatal("ошибка запуска http-сервера: ", err) return}</i>: Здесь мы проверяем,
+        есть ли какие-либо проблемы при запуске сервера. Если да, зарегистрируйте ошибку
+        и выйдите с кодом состояния 1.</li>
+</ul>
+
+<h2>Создание простого TCP-сервера</h2>
+<p>Всякий раз, когда вам нужно построить высокопроизводительную систему, написание TCP-
+    сервера всегда является лучшим выбором по сравнению с HTTP-сервером, поскольку TCP-сокеты менее массивны,
+    чем HTTP. Go поддерживает и предоставляет удобный способ написания TCP-серверов с использованием
+    пакета <i>net</i>, который мы рассмотрим в этом рецепте.</p>
+
+<h3>Как это сделать ...</h3>
+<ol>В этом рецепте мы собираемся создать простой TCP-сервер, который будет принимать соединения
+    на локальном хосте: 8080. Выполните следующие шаги:
+    <li>Создайте tcp-server.go и скопируйте следующее содержимое:</li>
+    <pre><code>
+package main
+
+import (
+    "log"
+    "net"
+)
+
+const (
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+    CONN_TYPE = "tcp"
+)
+
+func main(){
+
+    listener, err := net.Listen(CONN_TYPE, CONN_HOST + ":" +CONN_PORT)
+    if err != nil{
+        log.Fatal("Ошибка запуска TCP-сервера : ", err)
+    }
+
+    defer listener.Close()
+    
+    log.Println("Слушаю" + CONN_HOST + ":" + CONN_PORT)
+    for {
+        conn, err := listener.Accept()
+        if err != nil{
+            log.Fatal("Ошибка приёма: ", err.Error())
+        }
+        log.Println(conn)
+    }
+}
+    </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run tcp-server.go
+    </p>
+</ol>
+
+<h3>Как это работает</h3>
+<p>Как только мы запустим программу, TCP-сервер начнет локально прослушивать порт 8080.</p>
+<ul>Давайте разберемся, что означает каждая строка в программе:
+    <li><i>package main</i>: определяет имя пакета программы.</li>
+    <li><i>import( "log" "net")</i>: это команда препроцессора, которая сообщает компилятору Go включить
+        все файлы из пакета <i>log</i> и <i>net</i>.</li>
+    <li><i>const ( CONN_HOST = «localhost» CONN_PORT = «8080» CONN_TYPE = «tcp»)</i>: мы объявляем
+        константы в программе Go, используя ключевое слово const. Здесь мы объявляем три
+        константы: одна — CONN_HOST со значением localhost, другая — CONN_PORT со
+        значением 8080 и, наконец, CONN_TYPE со значением tcp.</li>
+</ul>
+<ul>Далее мы объявили метод <i>main()</i>, с которого начинается выполнение программы. Поскольку этот
+    метод делает много вещей, давайте разберемся в нем построчно:
+    <li><i>listener, err := net.Listen(CONN_TYPE, CONN_HOST + ":" + CONN_PORT)</i>: это создает TCP-
+        сервер, работающий на локальном хосте с портом 8080.</li>
+    <li><i>if err != nil { log.Fatal("Ошибка запуска tcp-сервера: ", err) }</i>: Здесь мы проверяем, есть ли
+        какие-либо проблемы при запуске TCP-сервера. Если да, зарегистрируйте ошибку и выйдите
+        с кодом состояния 1.</li>
+    <li><i>defer Listener.Close()</i>: этот оператор defer закрывает прослушиватель TCP-сокета при
+        закрытии приложения.</li>
+</ul>
+<p>Далее мы принимаем входящий запрос к TCP-серверу в постоянном цикле, и если
+    при приеме запроса возникают ошибки, то логируем его и выходим; в противном случае мы просто
+    печатаем объект подключения на консоли сервера следующим образом:</p>
+<pre><code>
+for {
+    conn, err := listener.Accept()
+    if err != nil{
+        log.Fatal("Error accepting: ", err.Error())
+    }
+    log.Println(conn)
+}
+</code></pre>
+
+<h2>Чтение данных из TCP-соединения</h2>
+
+<p>Одним из наиболее распространенных сценариев в любом приложении является взаимодействие клиента с сервером
+    . TCP — один из наиболее широко используемых протоколов для этого взаимодействия. Go предоставляет
+    удобный способ чтения данных входящего соединения через bufio, реализующий буферизованный
+    ввод/вывод, который мы рассмотрим в этом рецепте.</p>
+<p>Поскольку в предыдущем рецепте мы уже создали TCP-сервер, мы обновим его для
+    чтения данных из входящих соединений.</p>
+
+<h3>Как это сделано ...</h3>
+<p>В этом рецепте мы собираемся обновить метод main(), чтобы он вызывал метод handleRequest,
+    передавая объект соединения для чтения и печати данных на консоли сервера. Выполните
+    следующие шаги:</p>
+<ol>
+    <li>Создайте tcp-server-read-data.go и скопируйте следующее содержимое:</li>
+<pre><code>
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "log"
+    "net"
+)
+
+const (
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+    CONN_TYPE = "tcp"
+)
+
+func main(){
+    listener, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+    
+    if err != nil{
+        log.Fatal("Error starting tcp server : ", err)
+    }
+
+    defer listener.Close()
+
+    log.Println("Listening on " + CONN_HOST + ":" + CONN_PORT)
+    
+    for {
+        conn, err := listener.Accept()
+        if err != nil {
+            log.Fatal("Error accepting: ", err.Error())
+        }
+
+        go handleRequest(conn)
+    }
+}
+
+func handleRequest(conn net.Conn) {
+    message, err := bufio.NewReader(conn).ReadString('\n')
+    if err != nil {
+        fmt.Println("Error reading:", err.Error())
+    }
+
+    fmt.Print("Message Received from the client: ", string(message))
+    conn.Close()
+}        
+</code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run tcp-server-read-data.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, TCP-сервер начнет локально прослушивать порт 8080.
+    Выполнение команды echo из командной строки следующим образом отправит сообщение на
+    TCP-сервер:</p>
+<p class="terminal">
+    $ echo -n "Hello to TCP server\n" | nc localhost 8080
+
+</p>
+<p>Очевидно, это записывает на консоль сервера, как показано на следующем снимке экрана:</p>
+<p class="terminal">
+    ubuntu@ubuntu:~/codeGo/CookBook/part1-1$ go run .
+
+    2023/09/22 16:14:43 Listening on localhost:8080
+    Message Received from the client: Hello to TCP server
+
+</p>
+<ol>Давайте разберемся с изменениями, которые мы внесли в этот рецепт:
+    <li>Сначала мы вызвали handleRequest из метода main(), используя ключевое слово <i>go</i>, что означает, что мы вызываем функцию в горутине, следующим образом:<li>
+        <pre><code>
+    func main(){
+        ...
+
+        go handleRequest(conn)
+        
+        ...
+}
+        </code></pre>
+    <li>Далее мы определили функцию handleRequest, которая считывает входящее соединение
+        в буфер до первого появления <i>\n</i> и выводит сообщение на консоль. Если при чтении сообщения возникают какие-либо ошибки, он печатает
+        сообщение об ошибке вместе с объектом ошибки и, наконец, закрывает соединение следующим образом:</li>
+<pre><code>
+func handleRequest(conn net.Conn) {
+    message, err := bufio.NewReader(conn).ReadString('\n')
+    
+    if err != nil{
+        fmt.Println("Error reading:", err.Error())
+    }
+
+    fmt.Print("Message Received: ", string(message))
+    conn.Close()
+}
+</code></pre>
+</ol>
+
+<h2>Запись данных в TCP-соединение</h2>
+<p>Другой распространенный и важный сценарий в любом веб-приложении — отправка данных
+    обратно клиенту или ответ клиенту. Go предоставляет удобный способ
+    записи сообщения о соединении в виде байтов, который мы рассмотрим в этом рецепте.</p>
+
+<p>Поскольку в предыдущем рецепте мы уже создали TCP-сервер, который считывает данные входящего соединения
+    , мы просто обновим его, чтобы записать сообщение обратно клиенту.</p>
+
+<h3>Как это сделать ...</h3>
+<p>В этом рецепте мы собираемся обновить метод handleRequest в программе, чтобы он мог записывать
+    данные обратно клиенту. Выполните следующие шаги:</p>
+
+<ol>
+    <li>Создайте tcp-server-write-data.go и скопируйте следующее содержимое:</li>
+    <pre><code>
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "log"
+    "net"
+)
+
+const (
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+    CONN_TYPE = "tcp"
+)
+
+func main() {
+    listener, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+    
+    if err != nil {
+        log.Fatal("Error starting tcp server : ", err)
+    }
+
+    defer listener.Close()
+    
+    log.Println("Listening on " + CONN_HOST + ":" + CONN_PORT)
+    for {
+        conn, err := listener.Accept()
+        if err != nil {
+            log.Fatal("Error accepting: ", err.Error())
+        }
+        go handleRequest(conn)
+    }
+}
+
+func handleRequest(conn net.Conn) {
+    message, err := bufio.NewReader(conn).ReadString('\n')
+    
+    if err != nil {
+        fmt.Println("Error reading: ", err.Error())
+    }
+    
+    fmt.Print("Message Received:", string(message))
+    conn.Write([]byte(message + "\n"))
+    conn.Close()
+}
+</code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run tcp-server-write-data.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, TCP-сервер начнет локально прослушивать порт 8080.
+    Выполните команду echo из командной строки следующим образом:</p>
+<p class="terminal">
+    $ echo -n "Hello to TCP server\n" | nc localhost 8080
+</p>
+<p>Это даст нам следующий ответ от сервера:</p>
+<p class="terminal">
+    Hello to TCP server
+</p>
+<p>Давайте посмотрим на изменения, которые мы внесли в этот рецепт для записи данных клиенту.
+    Все в handleRequest точно такое же, как и в предыдущем рецепте, за исключением того, что мы
+    ввели новую строку, которая записывает данные в соединение в виде массива байтов, как показано ниже:</p>
+<pre><code>
+    func handleRequest(conn net.Conn){
+        ...
+
+        conn.Write([]byte(message + "\n"))
+        
+        ...
+}
+</code></pre>
+
+<h2>Реализация маршрутизации HTTP-запросов</h2>
+<p>В большинстве случаев вам приходится определять более одного URL-маршрута в веб-приложении,
+    что включает в себя сопоставление URL-пути с обработчиками или ресурсами. В этом рецепте мы
+    узнаем, как реализовать это в Go.</p>
+
+<h3>Как это сделать ...</h3>
+<p>В этом рецепте мы определим три маршрута, такие как <i>/, /login и /logout</i>, вместе с их
+    обработчиками. Выполните следующие шаги:</p>
+<ol>
+    <li>Создайте http-server-basic-routing.go и скопируйте следующий контент:</li>
+    <pre><code>
+package main
+
+import (
+    "fmt"
+    "log"
+    "net/http"
+)
+
+const (
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+)
+
+func helloWorld(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Hello World!")
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Login Page!")
+}
+
+func logout(w http.ResponseWriter, r *http.Request){
+    fmt.Fprintf(w, "Logout Page!")
+}
+
+func main() {
+    http.HandleFunc("/", helloWorld)
+    http.HandleFunc("/login", login)
+    http.HandleFunc("/logout", logout)
+    
+    err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, nil)    
+    
+    if err != nil {
+        log.Fatal("error starting http server : ", err)
+        return
+    }
+}
+</code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run http-server-basic-routing.go
+    </p>
+</ol>
+
+<h3>Как это работает...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080 и
+    получать доступ к <span>http://localhost:8080/</span>, <span>http://localhost:8080/login</span> и <span>http://localhost:8080/logout</span>
+    из браузера. или командная строка отобразит сообщение, определенное в соответствующем
+    определении обработчика. Например, выполните <span>http://localhost:8080/</span> из командной строки
+    следующим образом:</p>
+<p class="terminal">
+    $ curl -X GET -i http://localhost:8080/
+</p>
+
+<p>Это даст нам следующий ответ от сервера:</p>
+<p class="terminal">
+    ubuntu@ubuntu:~/codeGo/CookBook/part1-1$ curl -X GET -i http://localhost:8080/
+
+    HTTP/1.1 200 OK
+    Date: Fri, 22 Sep 2023 13:40:00 GMT
+    Content-Length: 12
+    Content-Type: text/plain; charset=utf-8
+    
+    Hello World!
+
+</p>
+<p>Мы также могли бы выполнить <span>http://localhost:8080/login</span> из командной строки следующим образом:</p>
+<p class="terminal">
+    $ curl -X GET -i http://localhost:8080/login
+</p>
+<p>Это даст нам следующий ответ от сервера:</p>
+<p class="terminal">
+    debian@debian:~/codeGo/CookBook/part1-1$ curl -X GET -i http://localhost:8080/login
+    HTTP/1.1 200 OK
+    Date: Fri, 22 Sep 2023 13:43:36 GMT
+    Content-Length: 11
+    Content-Type: text/plain; charset=utf-8
+
+    Login Page!
+</p>
+<ol>Давайте разберемся в написанной нами программе:
+    <li>Мы начали с определения трех обработчиков или веб-ресурсов, таких как следующие:</li>
+    <pre><code>
+        func helloWorld(w http.ResponseWriter, r *http.Request){
+            fmt.Fprintf(w, "Hello World!")
+        }
+        
+        func login(w http.ResponseWriter, r *http.Request){
+            fmt.Fprintf(w, "Login Page!")
+        }
+        
+        func logout(w http.ResponseWriter, r *http.Request){
+            fmt.Fprintf(w, "Logout Page!")
+        }
+        </code></pre>
+        <p>Здесь обработчик helloWorld пишет Hello World! в потоке ответов HTTP. Аналогичным
+            образом обработчики входа и выхода записывают страницу входа! и страница выхода! в
+            потоке ответов HTTP.</p>
+    <li>Затем мы зарегистрировали три URL-пути — <i>/, /login и /logout</i> в DefaultServeMux,
+        используя http.HandleFunc() . Если шаблон URL-адреса входящего запроса соответствует одному из
+        зарегистрированных путей, то вызывается соответствующий обработчик, передавая
+        ему (http.ResponseWriter, *http.Request) в качестве параметра следующим образом:</li>
+<pre><code>
+func main(){
+    http.HandleFunc("/", helloWorld)
+    http.HandleFunc("/login", login)
+    http.HandleFunc("/logout", logout)
+    
+    err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, nil)
+    
+    if err != nil {
+        log.Fatal("error starting http server : ", err)
+        return
+    }
+}
+</code></pre>
+</ol>
+
+<h2>Реализация маршрутизации HTTP-запросов с использованием Gorilla Mux</h2>
+
+<p>Пакет net/http Go предлагает множество функций для URL-маршрутизации HTTP-
+    запросов. Единственное, что он делает не очень хорошо, — это динамическую маршрутизацию URL-адресов. К счастью, мы
+    можем добиться этого с помощью пакета gorilla/mux, который мы рассмотрим в этом рецепте.</p>
+
+<h3>Как это сделать ...</h3>
+<p>В этом рецепте мы будем использовать gorilla/mux для определения нескольких маршрутов, как мы это делали в предыдущем
+    рецепте, а также их обработчиков или ресурсов. Как мы уже видели в одном из наших
+    предыдущих рецептов, чтобы использовать внешние пакеты, сначала нам нужно установить пакет с помощью
+    команды go get или скопировать его вручную в $GOPATH/src или $GOPATH.
+    В рецепте мы сделаем то же самое. Выполните следующие шаги:</p>
+
+<ol>
+    <li>Установите github.com/gorilla/mux с помощью команды go get следующим образом:</li>
+    <p class="terminal">
+
+        $ go get github.com/gorilla/mux
+    
+    </p>
+    <li>Создайте http-server-gorilla-mux-routing.go и скопируйте следующий контент:</li>
+    <pre><code>
+package main
+
+import (
+    "net/http"
+    "github.com/gorilla/mux"
+)
+
+const (
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+)
+
+var GetRequestHandler = http.HandlerFunc(
+    func(w http.ResponseWriter, r *http.Request) {
+        w.Write([]byte("Hello World!"))
+    })
+
+var PostRequestHandler = http.HandlerFunc(
+    func(w http.ResponseWriter, r *http.Request){
+        w.Write([]byte("It's a Post Request!"))
+    })
+
+var PathVariableHandler = http.HandlerFunc(
+    func(w http.ResponseWriter, r *http.Request){
+        vars := mux.Vars(r)
+        name := vars["name"]
+        w.Write([]byte("Hi " + name))
+    })
+
+func main(){
+    router := mux.NewRouter()
+    router.Handle("/", GetRequestHandler).Methods("GET")
+    router.Handle("/post", PostRequestHandler).Methods("POST")
+    router.Handle("/hello/{name}", PathVariableHandler).Methods("GET", "PUT")
+
+    http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+}
+    </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run http-server-gorilla-mux-routing.go
+    </p>
+</ol>   
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080 и
+    получать доступ к <i>http://localhost:8080/</i>, <i>http://localhost:8080/post</i> и
+    <i>http://localhost:8080/hello/foo</i>. из браузера или командной строки выдаст сообщение
+    , определенное в соответствующем определении обработчика. Например, выполните
+    <i>http://localhost:8080/</i> из командной строки следующим образом:</p>
+
+<p class="terminal">
+
+    $ curl -X GET -i http://localhost:8080/
+
+</p>
+<p>Это даст нам следующий ответ от сервера:</p>
+<p class="terminal">
+    debian@debian:~/codeGo/CookBook/part1-1$ curl -X GET -i http://localhost:8080/
+    
+    HTTP/1.1 200 OK
+    Date: Fri, 22 Sep 2023 14:00:23 GMT
+    Content-Length: 12
+    Content-Type: text/plain; charset=utf-8
+
+    Hello World!
+
+</p>
+<p>Мы также могли бы выполнить <span>http://localhost:8080/hello/foo</span> из командной строки следующим образом:</p>
+<p class="terminal">
+
+    $ curl -X GET -i http://localhost:8080/hello/foo
+
+</p>
+<p>Это даст нам следующий ответ от сервера:</p>
+<p class="terminal">
+    debian@debian:~/codeGo/CookBook/part1-1$ curl -X GET -i http://localhost:8080/hello/foo80/hello/foo
+
+    HTTP/1.1 200 OK
+    Date: Fri, 22 Sep 2023 14:03:50 GMT
+    Content-Length: 6
+    Content-Type: text/plain; charset=utf-8
+
+    Hi foo
+</p>
+
+<p>Давайте разберемся с изменениями кода, которые мы внесли в этом рецепте:</p>
+<ol>
+    <li>Сначала мы определили GetRequestHandler и PostRequestHandler, которые просто записывают
+        сообщение в поток ответов HTTP, как показано ниже:</li>
+        <pre><code>
+var GetRequestHandler = http.HandlerFunc(
+    func(w http.ResponseWriter, r *http.Request){
+        w.Write([]byte("Hello World!"))
+    })
+
+var PostRequestHandler = http.HandlerFunc(
+    func(w http.ResponseWriter, r *http.Request){
+        w.Write([]byte("It's a Post Request!"))
+    })
+        </code></pre>
+    <li>Далее мы определили PathVariableHandler, который извлекает переменные пути запроса, получает значение
+        и записывает его в поток ответов HTTP следующим образом:</li>
+        <pre><code>
+var PathVariableHandler = http.HandlerFunc(
+    func(w http.ResponseWriter, r *http.Request){
+        vars := mux.Vars(r)
+        name := vars["name"]
+        w.Write([]byte("Hi " + name))
+    })
+        </code></pre>
+    <li>Затем мы зарегистрировали все эти обработчики на маршрутизаторе gorilla/mux и создали
+        его экземпляр, вызвав обработчик NewRouter() мультиплексора следующим образом:</li>
+        <pre><code>
+func main(){
+    router := mux.NewRouter()
+    router.Handle("/", GetRequestHandler).Methods("GET")
+    router.Handle("/post", PostRequestHandler).Methods("POST")
+    router.Handle("/hello/{name}", PathVariableHandler).Methods("GET", "PUT")
+
+    http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+}
+        </code></pre>
+</ol>
+
+<h2>Логирование HTTP-запросов</h2>
+<p>Регистрация HTTP-запросов всегда полезна при устранении неполадок веб-приложения, поэтому
+    рекомендуется регистрировать запрос/ответ с соответствующим сообщением и уровнем ведения журнала. Go
+    предоставляет пакет журналов, который может помочь нам реализовать ведение журналов в приложении.
+    Однако в этом рецепте мы будем использовать обработчики журналирования Gorilla для его реализации,
+    поскольку библиотека предлагает больше функций, таких как ведение журнала в комбинированном
+    формате журнала Apache и общем формате журнала Apache, которые еще не поддерживаются пакетом журналов Go
+    .</p>
+
+<p>Поскольку в предыдущем рецепте мы уже создали HTTP-сервер и определили маршруты с использованием Gorilla Mux , мы обновим его, включив в него обработчики журналирования Gorilla.</p>
+
+<h3>Как это сделать ...</h3>
+<p>Давайте реализуем ведение журнала с помощью обработчиков Gorilla. Выполните следующие шаги:</p>
+<ol>
+    <li>Установите пакеты github.com/gorilla/handler и github.com/gorilla/mux с помощью
+        команды go get следующим образом:</li>
+        <p class="terminal">
+
+            $ go get github.com/gorilla/handlers
+            $ go get github.com/gorilla/mux
+        
+        </p>
+    <li>Создайте http-server-request-logging.go и скопируйте следующий контент:</li>
+    <pre><code>
+package main
+
+import (
+    "net/http"
+    "os"
+    "github.com/gorilla/handlers"
+    "github.com/gorilla/mux"
+)
+
+const (
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+)
+
+var GetRequestHandler = http.HandlerFunc(
+    func(w http.ResponseWriter, r *http.Request){
+        w.Write([]byte("Hello World!"))
+    })
+
+var PostRequestHandler = http.HandlerFunc(
+    func(w http.ResponseWriter, r *http.Request){
+        w.Write([]byte("It's a Post Request!"))
+    })
+
+var PathVariableHandler = http.HandlerFunc(
+    func(w http.ResponseWriter, r *http.Request){
+        vars := mux.Vars(r)
+        name := vars["name"]
+        w.Write([]byte("Hi " + name))
+    })
+
+func main(){
+    router := mux.NewRouter()
+    router.Handle("/", handlers.LoggingHandler(os.Stdout,
+    http.HandlerFunc(GetRequestHandler))).Methods("GET")
+
+    logFile, err := os.OpenFile("server.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+    
+    if err != nil {
+        log.Fatal("error starting http server : ", err)
+        return
+    }
+
+    router.Handle("/post", handlers.LoggingHandler(logFile, PostRequestHandler)).Methods("POST")
+    router.Handle("/hello/{name}", handlers.CombinedLoggingHandler(logFile, PathVariableHandler))
+                                                                                .Methods("GET")
+    
+    http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+}
+    </code></pre>
+    <li>Запустите программу, используя следующую команду:</li>
+    <p class="terminal">
+
+        $ go run http-server-request-logging.go
+
+    </p>
+</ol>
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.
+    Выполните запрос GET из командной строки следующим образом:</p>
+<p class="terminal">
+
+    $ curl -X GET -i http://localhost:8080/
+
+</p>
+<p>При этом детали запроса будут записываться в журнал сервера в общем формате журнала Apache,
+    как показано на следующем снимке экрана:</p>
+<p class="terminal">
+    debian@debian:~/codeGo/CookBook/part1-4$ go run  .
+    
+    127.0.0.1 - - [22/Sep/2023:17:23:39 +0300] "GET / HTTP/1.1" 200 12
+    127.0.0.1 - - [22/Sep/2023:17:24:14 +0300] "GET / HTTP/1.1" 200 12
+    
+</p>
+<p>Мы также могли бы выполнить <span>http://localhost:8080/hello/foo</span> из командной строки следующим образом:</p>
+<p class="terminal">
+
+    $ curl -X GET -i http://localhost:8080/hello/foo
+
+</p>
+При этом детали запроса будут записываться в файл server.log в комбинированном формате журнала Apache,
+как показано на следующем снимке экрана:
+<p class="terminal">
+    127.0.0.1 - - [22/Sep/2023:17:26:41 +0300] "GET /hello/foo HTTP/1.1" 200 6 "" "curl/8.2.1"
+    127.0.0.1 - - [22/Sep/2023:17:28:48 +0300] "GET /hello/foo HTTP/1.1" 200 6 "" "curl/8.2.1"
+    127.0.0.1 - - [22/Sep/2023:17:28:49 +0300] "GET /hello/foo HTTP/1.1" 200 6 "" "curl/8.2.1"
+    127.0.0.1 - - [22/Sep/2023:17:28:49 +0300] "GET /hello/foo HTTP/1.1" 200 6 "" "curl/8.2.1"
+    127.0.0.1 - - [22/Sep/2023:17:28:50 +0300] "GET /hello/foo HTTP/1.1" 200 6 "" "curl/8.2.1"
+    127.0.0.1 - - [22/Sep/2023:17:28:51 +0300] "GET /hello/foo HTTP/1.1" 200 6 "" "curl/8.2.1"
+    127.0.0.1 - - [22/Sep/2023:17:28:51 +0300] "GET /hello/foo HTTP/1.1" 200 6 "" "curl/8.2.1"
+</p>
+<p>Давайте разберемся, что мы сделали в этом рецепте:</p>
+<ol>
+    <li>Во-первых, мы импортировали два дополнительных пакета, один — os, который мы используем для открытия файла
+        . Другой — github.com/gorilla/handlers, который мы используем для импорта
+        обработчиков журналирования для регистрации HTTP-запросов, как показано ниже:</li>
+        <pre><code>
+            import ( "net/http" "os" "github.com/gorilla/handlers" "github.com/gorilla/mux")
+        </code></pre>
+    <li>Далее мы изменили метод main(). Используя router.Handle("/",handlers.LoggingHandler(os.Stdout,
+        http.HandlerFunc(GetRequestHandler))).Methods("GET"), мы обернули GetRequestHandler обработчиком ведения журнала Gorilla
+        и передали ему стандартный поток вывода в качестве записывающего, что означает, что мы просто просим регистрировать
+        каждый запрос с URL-путем / на консоли в общем формате журнала Apache</li>
+    <li>Далее мы создаем новый файл с именем server.log в режиме только для записи или открываем его, если он
+        уже существует. Если возникла какая-либо ошибка, зарегистрируйте ее и выйдите с кодом состояния 1, как
+        показано ниже:</li>
+        <pre><code>
+    logFile, err := os.OpenFile("server.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+    
+    if err != nil{
+        log.Fatal("error starting http server : ", err)
+        return
+    }
+        </code></pre>
+    <li>Используя router.Handle("/post", handlers.LoggingHandler(logFile, PostRequestHandler)).Methods("POST"), мы обернули 
+        GetRequestHandler обработчиком ведения журнала Gorilla и передали ему файл в качестве средства записи, что означает,
+        что мы просто просим регистрировать каждый запрос с URL-путем /post в файле с именем /hello/{name} в общем формате журнала Apache.</li>
+    <li>Используя router.Handle("/hello/{name}", handlers.CombinedLoggingHandler(logFile, PathVariableHandler)).Methods("GET"),
+        мы обернули GetRequestHandler обработчиком ведения журнала Gorilla и передали ему файл в качестве средства записи, что
+        означает, что мы просто просим регистрировать каждый запрос с URL-путем /hello/{name} в файле с именем server.log в
+        комбинированном формате журнала Apache.</li>
+</ol>
+
+</body>
+
+</html>

@@ -1,0 +1,92 @@
+body {
+    /* background-image: url(DSC2943_by_kcpru.jpg); */
+    background-color: rgb(255, 255, 255);
+    max-width: 960px;
+    margin: 0 auto;
+    color: rgb(0, 0, 0);
+    font-size: 18px;
+    user-select: none;
+}
+
+table, th, td {
+    border: 1px solid rgb(2, 2, 2);
+    padding: 5px 1px;
+    margin: auto;
+    padding: auto;
+}
+th {
+    background-color: rgb(4, 50, 216);
+}
+i {
+    color:rgb(135, 35, 249);
+}
+
+pre {
+    display: block;
+    /* background-color: rgb(250, 246, 240); */
+    background: #f0f0f0;   
+    outline: 2px solid #ab9696; /* Чёрная рамка */
+    border: 3px solid #fff; /* Белая рамка */
+    border-radius: 10px; /* Радиус скругления */
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    font-family: Consolas,"courier new";
+    white-space: pre;
+    font-size: 80%;
+    color: rgb(81, 99, 125);
+    padding: 2px;
+  }
+span {
+  color:blue;
+  font-weight: bold;
+}
+
+img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 90%;
+    outline: 2px solid #ab9696; /* Чёрная рамка */
+        border: 3px solid #fff; /* Белая рамка */
+        border-radius: 10px; /* Радиус скругления */
+}
+.picture-msg {
+    text-align: center;
+}
+
+.note {
+        /* display: block; */
+        /* width: 100%; */
+        /* margin-left: auto;
+        margin-right: auto; */
+        background: rgb(251, 201, 1); /* Цвет фона */
+        outline: 2px solid #ab9696; /* Чёрная рамка */
+        border: 3px solid #fff; /* Белая рамка */
+        border-radius: 10px; /* Радиус скругления */
+        padding: 20px;
+}
+.ex {
+    border: dashed 1px #634F36;
+    background: #fffff5;
+    font-family: "Courier New", Courier, monospace; 
+    padding: 7px;
+    font-size: 80%;
+    margin: 0 0 1em;
+}
+.terminal {
+    display: block;
+    /* background-color: rgb(250, 246, 240); */
+    background: #010734;   
+
+    border-radius: 5px; 
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    font-family: Consolas,"courier new";
+    white-space: pre;
+    font-size: 100%;
+    color: rgb(249, 250, 252);
+    padding: 2px;
+}
+
