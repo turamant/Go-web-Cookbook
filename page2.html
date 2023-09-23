@@ -27,5 +27,145 @@
     В этой главе мы начнем с создания базового шаблона, а затем перейдем к обслуживанию
     статических файлов, таких как .js, .css и изображений, из файловой системы, а затем создадим, прочитаем
     и проверим HTML-формы и загрузим файл в сервер.</p>
+
+<h2>Создание вашего первого шаблона</h2>
+<p>Шаблоны позволяют нам определять заполнители для динамического контента, которые могут быть заменены
+    значениями во время выполнения с помощью механизма шаблонов. Затем их можно преобразовать в
+    файл HTML и отправить клиенту. Создавать шаблоны в Go довольно просто, используя
+    пакет Go html/template, который мы рассмотрим в этом рецепте.</p>
+
+    <h3>Как это сделать ...</h3>
+<p>В этом рецепте мы собираемся создать файл first-template.html с парой заполнителей,
+    значения которых будут введены шаблонизатором во время выполнения. Выполните следующие
+    шаги:</p>
+<ol>
+    <li>Создайте файл first-template.html в каталоге шаблонов, выполнив следующую
+        команду Unix:</li>
+        <p class="terminal">
+
+            $ mkdir templates && cd templates && touch first-template.html
+
+        </p>
+    <li>Скопируйте следующее содержимое в first-template.html:</li>
+    <pre><code>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8"&gt;
+        &lt;title&gt;First Template&lt;/title&gt;
+        &lt;link rel="stylesheet" href="/static/stylesheets/main.css"&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Hello {{.Name}}!&lt;/h1&gt;
+        Your Id is {{.Id}}
+    &lt;/body&gt;
+&lt;/html&gt;
+    </code></pre>
+    <p>В предыдущем шаблоне есть два заполнителя: <i>{{.Name}}</i> и <i>{{.Id}}</i>,
+        значения которых будут заменены или введены обработчиком шаблонов во время выполнения.</p>
+    <li>Создайте файл first-template.go, где мы заполним значения заполнителей,
+        сгенерируем HTML-код в качестве вывода и запишем его клиенту следующим образом:</li>
+        <pre><code>
+package main
+
+import (
+    "fmt"
+    "html/template"
+    "log"
+    "net/http"
+)
+
+const (
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+)
+
+type Person struct {
+    Id string
+    Name string
+}
+
+func renderTemplate(w http.ResponseWriter, r *http.Request){
+    person := Person{Id: "1", Name: "Foo"}
+    parsedTemplate, _ := template.ParseFiles("templates/first-template.html")
+    err := parsedTemplate.Execute(w, person)
+
+    if err != nil{
+        log.Printf("Произошла ошибка при выполнении шаблона или записи его вывода. : ", err)
+        return
+    }
+}
+
+func main(){
+    http.HandleFunc("/", renderTemplate)
+    err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, nil)
+    if err != nil{
+        log.Fatal("error starting http server : ", err)
+        return
+    }
+}
+        </code></pre>
+        <p>Если все готово, структура каталогов должна выглядеть следующим образом:</p>
+        <p><img src="static/images/picture2-1.png"/></p>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+
+        $ go run first-template.go
+        
+    </p>
+</ol>
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Просмотр <span>http://localhost:8080</span> покажет нам сообщение Hello Foo! обслуживается шаблонизатором
+    , как показано на следующем снимке экрана:/p>
+<p><img src="static/images/picture2-2.png"/></p>
+<p>Выполните команду <span>curl -X GET http://localhost:8080</span> из командной строки следующим образом:</p>
+<p class="terminal">
+
+    debian@debian:~$ curl -X GET http://localhost:8080
+    &lt;html&gt;
+        &lt;head&gt;
+            &lt;meta charset="utf-8"&gt;
+            &lt;title&gt;First Template&lt;/title&gt;
+            &lt;link rel="stylesheet" href="/static/stylesheets/main.css"&gt;
+        &lt;/head&gt;
+        &lt;body&gt;
+            &lt;h1&gt;Hello Foo!&lt;/h1&gt;
+            Your Id is 1
+        &lt;/body&gt;
+    &lt;/html&gt;
+    
+</p>
+
+<p>Давайте разберемся в написанной нами программе Go:</p>
+<ul>
+    <li><i>type Person struct { Id string Name string }</i>: Здесь мы определяем тип структуры person, который
+        имеет поля Id и Name.</li>
+        <p class="note">
+            Имя поля в определении типа должно начинаться с заглавной буквы; в противном случае это приведет к ошибкам
+и не будет заменено в шаблоне.
+        </p>
+        <p>Далее мы определили обработчик <i>renderTemplate()</i>, который делает множество вещей.</p>
+    <li><i>person := Person{Id: "1", Name: "Foo"}</i>: Здесь мы инициализируем тип структуры person
+        с Id как 1 и Name как Foo.</li>
+    <li><i>parsedTemplate, _ := template.ParseFiles("templates/first-template.html")</i>: Здесь мы вызываем
+        ParseFiles из пакета html/template, который создает новый шаблон и
+        анализирует имя файла, которое мы передаем в качестве входных данных, которое является первым -template.html в
+        каталоге шаблонов. Результирующий шаблон будет иметь имя и содержимое входного файла.</li>
+    <li><i>err := parsedTemplate.Execute(w, person)</i>: Здесь мы вызываем обработчик Execute для
+        проанализированного шаблона, который вводит данные о человеке в шаблон, генерирует
+        выходные данные HTML и записывает их в поток ответов HTTP.</li>
+    <li><i>if err != nil {log.Printf("Произошла ошибка при выполнении шаблона или записи его
+        вывода: ", err) return }</i>: Здесь мы проверяем, есть ли какие-либо проблемы при
+        выполнении шаблона или записи его вывода в поток ответов. Если есть,
+        то мы регистрируем ошибку и выходим с кодом состояния 1.</li>
+</ul>
+
+<h2>Обслуживание статических файлов через HTTP........................</h2>
+
+
+
+
+
+
 </body>
 </html>

@@ -221,8 +221,10 @@ func BasicAuth(handler http.HandlerFunc, realm string) http.HandlerFunc{
 </i></p>
 <p>Мы просто передаем обработчик BasicAuth вместо nil или DefaultServeMux для обработки всех
     входящих запросов с шаблоном URL как /.</p>
+<p>Про аутентификацию читать на <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication" target="_blank">Mozilla.org</a></p>
+<p>Про базовую аутентификацию читать <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#basic_authentication_scheme" target="_blank">здесь</a></p>
 
-<h2>Оптимизация ответов HTTP-сервера с помощью сжатия GZIP</h2>
+    <h2>Оптимизация ответов HTTP-сервера с помощью сжатия GZIP</h2>
 <p>Сжатие GZIP означает отправку ответа клиенту с сервера в
     формате .gzip, а не отправку простого ответа, и всегда полезно отправлять
     сжатые ответы, если клиент/браузер поддерживает это.</p>
@@ -269,8 +271,7 @@ func helloWorld(w http.ResponseWriter, r *http.Request){
 func main(){
     mux := http.NewServeMux()
     mux.HandleFunc("/", helloWorld)
-    err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT,
-    handlers.CompressHandler(mux))
+    err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, handlers.CompressHandler(mux))
 
     if err != nil{
         log.Fatal("ошибка при запуске http-сервера : ", err)
@@ -327,6 +328,7 @@ func main(){
         и выйдите с кодом состояния 1.</li>
 </ul>
 
+
 <h2>Создание простого TCP-сервера</h2>
 <p>Всякий раз, когда вам нужно построить высокопроизводительную систему, написание TCP-
     сервера всегда является лучшим выбором по сравнению с HTTP-сервером, поскольку TCP-сокеты менее массивны,
@@ -334,8 +336,10 @@ func main(){
     пакета <i>net</i>, который мы рассмотрим в этом рецепте.</p>
 
 <h3>Как это сделать ...</h3>
-<ol>В этом рецепте мы собираемся создать простой TCP-сервер, который будет принимать соединения
-    на локальном хосте: 8080. Выполните следующие шаги:
+<p>В этом рецепте мы собираемся создать простой TCP-сервер, который будет принимать соединения
+    на локальном хосте: 8080.</p>
+</p> Выполните следующие шаги:</p>
+<ol>
     <li>Создайте tcp-server.go и скопируйте следующее содержимое:</li>
     <pre><code>
 package main
@@ -353,7 +357,7 @@ const (
 
 func main(){
 
-    listener, err := net.Listen(CONN_TYPE, CONN_HOST + ":" +CONN_PORT)
+    listener, err := net.Listen(CONN_TYPE, CONN_HOST + ":" + CONN_PORT)
     if err != nil{
         log.Fatal("Ошибка запуска TCP-сервера : ", err)
     }
@@ -376,7 +380,7 @@ func main(){
     </p>
 </ol>
 
-<h3>Как это работает</h3>
+<h3>Как это работает ...</h3>
 <p>Как только мы запустим программу, TCP-сервер начнет локально прослушивать порт 8080.</p>
 <ul>Давайте разберемся, что означает каждая строка в программе:
     <li><i>package main</i>: определяет имя пакета программы.</li>
