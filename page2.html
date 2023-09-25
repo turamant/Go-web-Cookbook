@@ -160,12 +160,305 @@ func main(){
         то мы регистрируем ошибку и выходим с кодом состояния 1.</li>
 </ul>
 
-<h2>Обслуживание статических файлов через HTTP........................</h2>
+<h2>Обслуживание статических файлов через HTTP</h2>
+<p>При разработке веб-приложений всегда рекомендуется обслуживать статические ресурсы,
+    такие как .js, .css и изображения, из файловой системы или любой сети доставки контента
+    (CDN), например Amazon CloudFront, а не обслуживать их из веб-
+    сервер. Это связано с тем, что все эти типы файлов являются статическими и не нуждаются в
+    обработке; так зачем нам создавать дополнительную нагрузку на сервер? Более того, это помогает повысить
+    производительность приложений, поскольку все запросы к статическим файлам будут обслуживаться из
+    внешних источников и, следовательно, снижать нагрузку на сервер.</p>
+<p>Пакета net/http Go достаточно для обслуживания статических ресурсов файловой системы через FileServer,
+     что мы и рассмотрим в этом рецепте.</p>
+<p>Поскольку в предыдущем рецепте мы уже создали шаблон, мы просто расширим его для
+    обслуживания статического файла .css из каталога static/css.</p>
+
+<h3>Как это сделать ...</h3>
+<p>В этом рецепте мы собираемся создать файловый сервер, который будет обслуживать статические ресурсы
+    файловой системы. Выполните следующие шаги:</p>
+    <ol>
+        <li>Создайте main.css внутри каталога static/css следующим образом:</li>
+        <p class="terminal">
+            $ mkdir static && cd static && mkdir css && cd css && touch main.css
+        </p>
+        <li>Скопируйте следующее содержимое в main.css:</li>
+        <pre><code>
+            body {color: #00008B}
+        </code></pre>
+        <li>Создайте файл own-static-files.go, где мы создадим FileServer, который будет обслуживать
+            ресурсы из каталога static/css, присутствующего в файловой системе, для всех
+            шаблонов URL-адресов с /static, следующим образом:</li>
+            <pre><code>
+    package main
+
+    import (
+        "fmt"
+        "html/template"
+        "log"
+        "net/http"
+    )
+
+    const (
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    type Person struct {
+        Name string
+        Age string
+    }
+
+    func renderTemplate(w http.ResponseWriter, r *http.Request){
+        person := Person{Id: "1", Name: "Foo"}
+
+        parsedTemplate, _ := template.ParseFiles("templates/first-template.html")
+        
+        err := parsedTemplate.Execute(w, person)
+        if err != nil {
+            log.Printf("Произошла ошибка при выполнении шаблона или записи его вывода. : ", err)
+            return
+        }
+    }
+
+    func main(){
+        fileServer := http.FileServer(http.Dir("static"))
+        http.Handle("/static/", http.StripPrefix("/static/", fileServer))
+        http.HandleFunc("/", renderTemplate)
+
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)
+        if err != nil {
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+            </code></pre>
+        <li>Обновите файл first-template.html (созданный в нашем предыдущем рецепте), включив в него файл main.css из
+            каталога static/css:</li>
+        <pre><code>
+    &lt;html&gt;
+        &lt;head&gt;
+            &lt;meta charset="utf-8"&gt;
+            &lt;title&gt;First Template&lt;/title&gt;
+            &lt;link rel="stylesheet" href="/static/css/main.css"&gt;
+        &lt;/head&gt;
+        &lt;body&gt;
+            &lt;h1&gt;Hello Foo!&lt;/h1&gt;
+            Your Id is 1
+        &lt;/body&gt;
+    &lt;/html&gt;
+        </code></pre>
+        <li>Запустите программу следующей командой:</li>
+        <p class="terminal">
+            $ go run serve-static-files.go
+        </p>
+    </ol>
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.
+    Просмотр <span>http://localhost:8080</span> покажет нам тот же результат, который мы видели в нашем предыдущем
+    рецепте, но на этот раз цвет текста изменился с черного по умолчанию до синего цвета, как
+    показано на следующем рисунке:</p>
+<p><img src="static/images/picture2-3.png"/></p>
+<p>Если мы посмотрим на вкладку «Сеть» в Chrome DevTools, мы увидим файл main.css, который был
+    загружен из каталога static/css, присутствующего в файловой системе.</p>
+<p>Давайте разберемся с изменениями, которые мы внесли в метод main() в рамках этого рецепта:</p>
+<ul>
+    <li><i>fileServer := http.FileServer(http.Dir("static"))</i>: Здесь мы создали файловый сервер, используя
+        обработчик FileServer пакета net/http, который обслуживает HTTP-запросы из
+        статического каталога, присутствующего в файловой системе.</li>
+    <li><i>http.Handle("/static/", http.StripPrefix("/static/", fileServer))</i>: Здесь мы регистрируем
+        обработчик http.StripPrefix("/static/", fileServer) с шаблоном URL-адреса /static, используя HandleFunc пакета net/http, что означает, что
+        http.StripPrefix("/static/", fileServer) выполняется и передает (http.ResponseWriter,
+        *http.Request) ему в качестве параметра всякий раз, когда мы обращаемся к URL-адресу HTTP с помощью
+        / статический узор.</li>
+    <li><i>http.StripPrefix("/static/", fileServer)</i>: возвращает обработчик, который обслуживает HTTP-
+        запросы, удаляя /static из пути URL-адреса запроса, и вызывает файловый
+        сервер. StripPrefix обрабатывает запрос пути, который не начинается с префикса,
+        отвечая HTTP 404.</li>
+</ul>
+
+<h2>Обслуживание статических файлов через HTTP с использованием Gorilla Mux</h2>
+<p>В предыдущем рецепте мы обслуживали статические ресурсы через файловый сервер HTTP Go. В
+    этом рецепте мы рассмотрим, как мы можем обслуживать его через маршрутизатор Gorilla Mux, который
+    также является одним из наиболее распространенных способов создания HTTP-маршрутизатора.</p>
+<p>Поскольку в нашем предыдущем рецепте мы уже создали шаблон, который обслуживает файл main.css из
+    каталога static/css, присутствующего в файловой системе, мы просто обновим его для использования
+    маршрутизатора Gorilla Mux.</p>
+
+<h3>Как это сделать ...</h3>    
+<ol>
+    <li>Установите пакет <span>github.com/gorilla/mux</span> с помощью команды go get следующим образом:</li>
+    <p class="terminal">
+        $ go get github.com/gorilla/mux
+    </p>
+    <li>Создайте own-static-files-gorilla-mux.go, где мы создадим маршрутизатор Gorilla Mux
+        вместо HTTP FileServer, как показано ниже:</li>
+        <pre><code>
+    package main
+
+    import (
+        "html/template"
+        "log"
+        "net/http"
+        "github.com/gorilla/mux"
+    )
+
+    const (
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    type Person struct {
+        Id string
+        Name string
+    }
+
+    func renderTemplate(w http.ResponseWriter, r *http.Request){
+        person := Person{Id: "1", Name: "Foo"}
+        
+        parsedTemplate, _ := template.ParseFiles("templates/first-template.html")
+        
+        err := parsedTemplate.Execute(w, person)
+        if err != nil {
+            log.Printf("Error occurred while executing the template or writing its output : ", err)
+            return
+        }
+    }
+
+    func main() {
+        router := mux.NewRouter()
+        
+        router.HandleFunc("/", renderTemplate).Methods("GET")
+        router.PathPrefix("/").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("static/"))))
+        
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+        if err != nil {
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+        </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run serve-static-files-gorilla-mux.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Просмотр <span>http://localhost:8080</span> покажет нам тот же результат, который мы видели в нашем предыдущем
+    рецепте, как показано на следующем снимке экрана:</p>
+<p><img src="static/images/picture2-3.png"/></p>
+<p>Давайте разберемся с изменениями, которые мы внесли в метод main() в рамках этого рецепта:</p>
+<ul>
+    <li><i>router :=mux.NewRouter()</i>: Здесь мы создали экземпляр маршрутизатора gorilla/mux, вызвав
+        обработчик NewRouter() мультиплексора.</li>
+    <li><i>router.HandleFunc("/",renderTemplate).Methods("GET")</i>: Здесь мы зарегистрировали шаблон URL-адреса /
+        с помощью обработчика renderTemplate. Это означает, что renderTemplate будет выполняться для
+        каждого запроса с шаблоном URL-адреса /.</li>
+    <li><i>router.PathPrefix("/").Handler(http.StripPrefix("/static",http.FileServer(http.Dir("static/"))))</i>: Здесь мы регистрируем / как новый маршрут вместе
+        с установкой обработчик, который будет выполнен после его вызова.</li>
+    <li><i>http.StripPrefix("/static", http.FileServer(http.Dir("static/")))</i>: возвращает обработчик,
+        который обслуживает HTTP-запросы, удаляя /static из пути URL-адреса запроса и
+        вызывая файловый сервер. StripPrefix обрабатывает запрос пути, который не начинается
+        с префикса, отвечая HTTP 404.</li>
+</ul>
+
+<h2>Создание вашей первой HTML-формы</h2>
+<p>Всякий раз, когда мы хотим получить данные от клиента и отправить их на сервер для
+    обработки, лучшим выбором будет реализация HTML-формы. Об этом мы и поговорим
+    в этом рецепте.</p>
+<p>В этом рецепте мы создадим простую HTML-форму с двумя полями ввода и кнопкой
+    для отправки формы. Выполните следующие шаги:</p>
+<ol>
+    <li>Создайте файл login-form.html в каталоге шаблонов следующим образом:</li>
+    <p class="terminal">
+        $ mkdir templates && cd templates && touch login-form.html
+    </p>
+    <li>Скопируйте следующее содержимое в файл login-form.html:</li>
+    <pre><code>
+&lt;html&gt;
+    &lt;head&gt;
+        ;First Form&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Login&lt;/h1&gt;
+        &lt;form method="post" action="/login"&gt;
+            &lt;label for="username"&gt;Username&lt;/label&gt;
+            &lt;input type="text" id="username" name="username"&gt;
+            &lt;label for="password"&gt;Password&lt;/label&gt;
+            &lt;input type="password" id="password" name="password"&gt;
+            &lt;button type="submit"&gt;Login&lt;/button&gt;
+        &lt;/form&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+    </code></pre>
+    <p>Предыдущий шаблон имеет два текстовых поля — имя пользователя и пароль — а также
+        кнопку «Войти».</p>
+    <p>При нажатии кнопки «Войти» клиент выполнит POST-вызов действия,
+        определенного в форме HTML, в нашем случае это /login.</p>
+    <li>Создайте html-form.go, где мы будем анализировать шаблон формы и записывать его в
+        поток ответов HTTP следующим образом:</li>
+        <pre><code>
+    package main
+
+    import(
+        "html/template"
+        "log"
+        "net/http"
+    )
+    
+    const (
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    func login(w http.ResponseWriter, r *http.Request){
+        parsedTemplate, _ := template.ParseFiles("templates/login-form.html")
+        parsedTemplate.Execute(w, nil)
+    }
+
+    func main(){
+        http.HandleFunc("/", login)
+        
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)
+        if err != nil{
+            log.Fatal("error starting http server : ", err)
+        return
+        }
+    }
+        </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run html-form.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Просмотр <span>http://localhost:8080</span> покажет нам HTML-форму, как показано на следующем
+    снимке экрана:</p>
+<p><img src="static/images/picture2-4.png"</p>
+<p>Давайте разберемся в написанной нами программе:</p>
+<ul>
+    <li><i>func login(w http.ResponseWriter, r *http.Request) { parsedTemplate, _ :=
+        template.ParseFiles("templates/login-form.html") parsedTemplate.Execute(w, nil) }</i>: это
+        функция Go, которая принимает ResponseWriter и Request в качестве входных параметров, анализирует
+        файл login-form.html и возвращает новый шаблон.</li>
+    <li><i>http.HandleFunc("/", login)</i>: здесь мы регистрируем функцию входа в систему с
+        шаблоном / URL-адреса, используя HandleFunc пакета net/http, что означает, что функция входа
+        выполняется каждый раз, когда мы обращаемся к URL-адресу HTTP с шаблоном /.
+        передавая ему ResponseWriter и Request в качестве параметров.</li>
+    <li><i>err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)</i>: Здесь мы вызываем
+        http.ListenAndServe для обслуживания HTTP-запросов, которые обрабатывают каждое входящее
+        соединение в отдельной Goroutine. ListenAndServe принимает два параметра —
+        адрес сервера и обработчик, где адрес сервера — localhost:8080, а
+        обработчик — nil.</li>
+    <li><i>if err != nil { log.Fatal("ошибка запуска http-сервера: ", err) return}</i>: Здесь мы проверяем, есть ли
+        проблема с запуском сервера. Если да, зарегистрируйте ошибку и выйдите
+        с кодом состояния 1.</li>
+</ul>
 
 
-
-
-
-
+<h2>Чтение вашей первой HTML-формы............</h2>
 </body>
 </html>

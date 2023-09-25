@@ -28,6 +28,9 @@ func renderTemplate(w http.ResponseWriter, r *http.Request){
 }
 
 func main(){
+    fileServer := http.FileServer(http.Dir("static"))
+    http.Handle("/static/", http.StripPrefix("/static/", fileServer))
+
     http.HandleFunc("/", renderTemplate)
     err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, nil)
     if err != nil{
