@@ -1,15 +1,14 @@
 &lt;html&gt;
     &lt;head&gt;
-        ;First Form&lt;/title&gt;
+        &lt;meta charset="utf-8"&gt;
+        &lt;title&gt;File Upload&lt;/title&gt;
     &lt;/head&gt;
     &lt;body&gt;
-        &lt;h1&gt;Login&lt;/h1&gt;
-        &lt;form method="post" action="/login"&gt;
-            &lt;label for="username"&gt;Username&lt;/label&gt;
-            &lt;input type="text" id="username" name="username"&gt;
-            &lt;label for="password"&gt;Password&lt;/label&gt;
-            &lt;input type="password" id="password" name="password"&gt;
-            &lt;button type="submit"&gt;Login&lt;/button&gt;
+        &lt;form action="/upload" method="post" enctype="multipart/form-data"&gt;
+            &lt;label for="file"&gt;File:&lt;/label&gt;
+            &lt;input type="file" name="file" id="file"&gt;
+            
+            &lt;input type="submit" name="submit" value="Submit"&gt;
         &lt;/form&gt;
     &lt;/body&gt;
 &lt;/html&gt;

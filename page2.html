@@ -459,6 +459,457 @@ func main(){
 </ul>
 
 
-<h2>Чтение вашей первой HTML-формы............</h2>
+<h2>Чтение вашей первой HTML-формы</h2>
+<p>После отправки HTML-формы нам необходимо прочитать данные клиента на стороне сервера, чтобы
+    предпринять соответствующие действия. Об этом мы и поговорим в этом рецепте.</p>
+<p>Поскольку в предыдущем рецепте мы уже создали HTML-форму, мы просто
+    расширим рецепт, чтобы читать значения его полей.</p>
+
+    <h3>Как это сделать</h3>
+<ol>
+    <li>Установите пакет github.com/gorilla/schema с помощью команды go get следующим образом:</li>
+    <p class="terminal">
+        $ go get github.com/gorilla/schema
+    </p>
+    <li>Создайте html-form-read.go, где мы будем читать поле HTML-формы после его декодирования
+        с помощью пакета github.com/gorilla/schema и писать Hello, а затем
+        имя пользователя в поток ответа HTTP, как показано ниже:</li>
+        <pre><code>
+    package main
+
+    import (
+        "fmt"
+        "html/template"
+        "log"
+        "net/http"
+        "github.com/gorilla/schema"
+    )
+
+    const (
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    type User struct {
+        Username string
+        Password string
+    }
+
+    func readForm(r *http.Request) *User{
+        r.ParseForm()
+        user := new(User)
+        decoder := schema.NewDecoder()
+        decodeErr := decoder.Decode(user, r.PostForm)
+        if decodeErr != nil{
+            log.Printf("ошибка сопоставления анализируемых данных формы со структурой: ", decodeErr)
+        }
+        return user
+    }
+
+    func login(w http.ResponseWriter, r *http.Request){
+        if r.Method == "GET"{
+            parsedTemplate, _ := template.ParseFiles("templates/login-form.html")
+            parsedTemplate.Execute(w, nil)
+        }
+        else{
+            user := readForm(r)
+            fmt.Fprintf(w, "Hello "+user.Username+"!")
+        }
+    }
+
+    func main(){
+        http.HandleFunc("/", login)
+        
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)
+        if err != nil{
+            log.Fatal("ошибка при запуске http-сервера : ", err)
+            return
+        }
+    }
+        </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run html-form-read.go
+    </p>
+</ol>
+
+<h3>Как это работает</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.
+    Просмотр <span>http://localhost:8080</span> покажет нам HTML-форму, как показано на следующем
+    снимке экрана:</p>
+<p><img src="static/images/picture2-5.png"</p>
+
+<p>После того, как мы введем имя пользователя и пароль и нажмем кнопку «Войти», мы увидим «
+    Hello», а затем имя пользователя в качестве ответа от сервера, как показано на следующем
+    снимке экрана:</p>
+
+    <p><img src="static/images/picture2-6.png"</p>
+<p>Давайте разберемся с изменениями, которые мы внесли в рамках этого рецепта:</p>
+<ol>
+    <li>Используя import ( "fmt" "html/template" "log" "net/http" "github.com/gorilla/schema"), мы
+        импортировали два дополнительных пакета — fmt и github.com/gorilla/schema, которые помогают
+        конвертировать структуры для значений формы и обратно.</li>
+    <li>Далее мы определили тип структуры User, который имеет поля «Имя пользователя» и «Пароль», следующим образом
+        :</li>
+        <pre><code>
+            type User struct {
+                Username string
+                Password string
+            }
+        </code></pre>
+    <li>Затем мы определили обработчик readForm, который принимает HTTP-запрос в качестве входного
+        параметра и возвращает пользователя, следующим образом:</li>
+        <pre><code>
+            func readForm(r *http.Request) *User{
+                r.ParseForm()
+                user := new(User)
+                decoder := schema.NewDecoder()
+                decodeErr := decoder.Decode(user, r.PostForm)
+                if decodeErr != nil{
+                    log.Printf("ошибка сопоставления анализируемых данных формы со структурой: ", decodeErr)
+                }
+                return user
+            }
+        </code></pre>
+</ol>
+<p>Давайте разберемся в этой функции Go подробно:</p>
+<ul>
+    <li><i>r.ParseForm()</i>: здесь мы анализируем тело запроса как форму и помещаем результаты в
+        r.PostForm и r.Form.</li>
+    <li><i>ser := new(User)</i>: Здесь мы создаем новый тип структуры User.</li>
+    <li><i>decoder := Schema.NewDecoder()</i>: Здесь мы создаем декодер, который будем
+        использовать для заполнения пользовательской структуры значениями формы.</li>
+    <li>decodeErr := decoder.Decode(user, r.PostForm): Здесь мы декодируем проанализированные данные формы из
+        параметров тела POST в пользовательскую структуру.</li>
+        <p class="note">
+            r.PostForm доступен только после вызова ParseForm.
+        </p>
+    <li><i>if decodeErr != nil { log.Printf("ошибка сопоставления анализируемых данных формы со структурой: ", decodeErr)
+    }</i>: Здесь мы проверяем, есть ли какие-либо проблемы с сопоставлением данных формы со
+    структурой. Если есть, то зарегистрируйтесь.</li>
+</ul>
+<p>Затем мы определили обработчик входа в систему, который проверяет, является ли HTTP-запрос, вызывающий обработчик,
+    запросом GET, а затем анализирует файл login-form.html из каталога шаблонов и записывает его
+    в поток ответов HTTP; в противном случае он вызывает обработчик readForm следующим образом:</p>
+
+<pre><code>
+    func login(w http.ResponseWriter, r *http.Request){
+        if r.Method == "GET"{
+            parsedTemplate, _ := template.ParseFiles("templates/login-form.html")
+            parsedTemplate.Execute(w, nil)
+        }
+        else{
+            user := readForm(r)
+            fmt.Fprintf(w, "Hello "+user.Username+"!")
+        }
+    }
+</code></pre>
+
+<h2>Проверка вашей первой HTML-формы</h2>
+
+<p>Большую часть времени нам приходится проверять входные данные клиента перед их обработкой, чего можно
+    добиться за счет количества внешних пакетов в Go, таких как gopkg.in/goplayground/validator.v9, gopkg.in/validator.v2 и github.com/asaskevich/govalidator.</p>
+<p>B этом рецепте мы будем работать с самым известным и часто используемым
+    валидатором github.com/asaskevich/govalidator для проверки нашей HTML-формы.</p>
+
+<p>Поскольку в предыдущем рецепте мы уже создали и прочитали HTML-форму, мы
+    просто расширим ее, чтобы проверить значения ее полей.</p>
+
+    <h3>Как это сделать ...</h3>
+<ol>
+    <li>Установите github.com/asaskevich/govalidator и пакет github.com/gorilla/schema
+        с помощью команды go get следующим образом:</li>
+        <p class="terminal">
+            $ go get github.com/asaskevich/govalidator
+            $ go get github.com/gorilla/schema
+        </p>
+    <li>Создайте html-form-validation.go, где мы будем читать HTML-форму, декодировать ее с помощью
+        github.com/gorilla/schema и проверять каждое ее поле на соответствие тегу, определенному в
+        структуре User, с помощью github.com/asaskevich/govalidator. , следующее:</li>
+        <pre><code>
+    package main
+
+    import(
+        "fmt"
+        "html/template"
+        "log"
+        "net/http"
+        "github.com/asaskevich/govalidator"
+        "github.com/gorilla/schema"
+    )
+
+    const(
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+        USERNAME_ERROR_MESSAGE = "Please enter a valid Username"
+        PASSWORD_ERROR_MESSAGE = "Please enter a valid Password"
+        GENERIC_ERROR_MESSAGE = "Validation Error"
+    )
+
+    type User struct{
+        Username string `valid:"alpha,required"`
+        Password string `valid:"alpha,required"`
+    }
+
+    func readForm(r *http.Request) *User{
+        r.ParseForm()
+        user := new(User)
+        decoder := schema.NewDecoder()
+        decodeErr := decoder.Decode(user, r.PostForm)
+        if decodeErr != nil{
+            log.Printf("error mapping parsed form data to struct : ",decodeErr)
+        }
+        return user
+    }
+
+    func validateUser(w http.ResponseWriter, r *http.Request, user *User) (bool, string){
+        valid, validationError := govalidator.ValidateStruct(user)
+        if !valid{
+            usernameError := govalidator.ErrorByField(validationError,"Username")
+            passwordError := govalidator.ErrorByField(validationError,"Password")
+            if usernameError != ""{
+                log.Printf("username validation error : ", usernameError)
+                return valid, USERNAME_ERROR_MESSAGE
+            }
+            if passwordError != ""{
+                log.Printf("password validation error : ", passwordError)
+                return valid, PASSWORD_ERROR_MESSAGE
+            }
+        }
+        return valid, GENERIC_ERROR_MESSAGE
+    }
+
+    func login(w http.ResponseWriter, r *http.Request){
+        if r.Method == "GET"{
+            parsedTemplate, _ := template.ParseFiles("templates/login-form.html")
+            parsedTemplate.Execute(w, nil)
+        }
+        else{
+            user := readForm(r)
+            valid, validationErrorMessage := validateUser(w, r, user)
+            if !valid{
+                fmt.Fprintf(w, validationErrorMessage)
+                return
+            }
+        fmt.Fprintf(w, "Hello "+user.Username+"!")
+        }
+    }
+
+    func main(){
+        http.HandleFunc("/", login)
+    
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)
+        if err != nil{
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+        </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run html-form-validation.go
+    </p>
+</ol>
+
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.
+Просмотр <span>http://localhost:8080</span> покажет нам HTML-форму, как показано на следующем
+снимке экрана:</p>
+<p><img src="static/images/picture2-7.png"</p>
+<p>Затем отправьте форму с допустимыми значениями:</p>
+<p><img src="static/images/picture2-8.png"</p>
+<p>Он покажет нам «Hello», а затем имя пользователя на экране браузера, как показано на
+следующем снимке экрана:</p>
+<p><img src="static/images/picture2-9.png"</p>
+<p>Отправка формы со значением, отличным от альфа, в любом из полей покажет нам
+сообщение об ошибке. Например, отправка формы со значением имени пользователя 1234:</p>
+<p><img src="static/images/picture2-10.png"</p>
+<p>В браузере появится сообщение об ошибке, как показано на следующем снимке экрана:</p>
+<p><img src="static/images/picture2-11.png"</p>
+<p>более того, мы можем отправить HTML-форму из командной строки следующим образом:</p>
+<p class="terminal">
+    $ curl --data "username=Foo&password=password" http://localhost:8080/
+
+</p>
+<p>Это даст нам тот же результат, что и в браузере:</p>
+<p class="terminal">
+    debian@debian:~$ curl --data "username=Turamant&password=password" http://localhost:8080/
+    
+    Hello Turamant
+
+</p>
+
+<p>Давайте разберемся с изменениями, которые мы внесли в этот рецепт:</p>
+<ol>
+    <li>Используя импорт («fmt», «html/template», «log», «net/http» «github.com/asaskevich/govalidator» «github.com/gorilla/schema»), мы импортировали
+        дополнительный пакет — github. com/asaskevich/govalidator, который помогает нам проверять
+        структуры.</li>
+    <li>Затем мы обновили тип структуры User, включив в него тег строкового литерала с допустимым ключом
+        и обязательным значением альфа, как показано ниже:</li>
+        <pre><code>
+        type User struct{
+            Username string `valid:"alpha,required"`
+            Password string `valid:"alpha,required"`
+        }
+        </code></pre>
+    <li>Затем мы определили обработчик <i>validateUser</i>, который принимает ResponseWriter, Request и User
+        в качестве входных данных и возвращает логическое значение и строку, которые являются статусом допустимости структуры и
+        сообщением об ошибке проверки соответственно. В этом обработчике мы проверяли теги структуры,
+        вызывая обработчик ValidateStruct из <i>govalidator</i>. Если при проверке поля возникла ошибка
+        , мы извлекаем ошибку, вызывая обработчик ErrorByField
+        из govalidator, и возвращаем результат вместе с сообщением об ошибке проверки.</li>
+    <li>Затем мы обновили обработчик входа в систему, чтобы он вызывал validateUser, передавая ему <i>(w http.ResponseWriter,
+        r *http.Request, user *User)</i> в качестве входных параметров и проверяя наличие
+        ошибок проверки. Если есть ошибки, мы пишем сообщение об ошибке в
+        поток ответов HTTP и возвращаем его.</li>
+</ol>
+
+<h2>Загрузка вашего первого файла</h2>
+<p>Одним из наиболее распространенных сценариев в любом веб-приложении является загрузка файла или
+    папки на сервер. Например, если мы разрабатываем портал вакансий, то нам, возможно, придется
+    предоставить возможность соискателю загрузить свой профиль/резюме, или, скажем,
+    нам нужно разработать веб-сайт электронной коммерции с функцией, позволяющей клиенту
+    загружать свои заказы оптом с помощью файла.</p>
+<p>Добиться возможности загрузки файла в Go довольно легко, используя встроенные
+    пакеты, которые мы рассмотрим в этом рецепте.</p>
+
+<h3>Как это сделать ...</h3>
+<p>В этом рецепте мы собираемся создать HTML-форму с полем типа файл, которая
+    позволит пользователю выбрать один или несколько файлов для загрузки на сервер посредством отправки формы.
+    Выполните следующие шаги:</p>
+<ol>
+    <li>Создайте файл upload-file.html в каталоге шаблонов следующим образом:</li>
+    <p class="terminal">
+        $ mkdir templates && cd templates && touch upload-file.html
+    </p>
+    <li>Скопируйте следующее содержимое в файл upload-file.html:</li>
+    <pre><code>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8"&gt;
+        &lt;title&gt;File Upload&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;form action="/upload" method="post" enctype="multipart/form-data"&gt;
+            &lt;label for="file"&gt;File:&lt;/label&gt;
+            &lt;input type="file" name="file" id="file"&gt;
+            
+            &lt;input type="submit" name="submit" value="Submit"&gt;
+        &lt;/form&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+    </code></pre>
+    <p>В предыдущем шаблоне мы определили поле типа file вместе с
+        кнопкой «Отправить».</p>
+    <p>При нажатии кнопки «Отправить» клиент кодирует данные, которые формируют тело
+        запроса, и выполняет POST-вызов действия формы, которым в нашем
+        случае является /upload.</p>
+    <li>Создайте файл upload-file.go, где мы определим обработчики для визуализации
+        шаблона загрузки файла, получения файла из запроса, его обработки и записи ответа в
+        поток ответов HTTP, как показано ниже:</li>
+        <pre><code>
+    package main
+
+    import(
+        "fmt"
+        "html/template"
+        "io"
+        "log"
+        "net/http"
+        "os"
+    )
+
+    const(
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    func fileHandler(w http.ResponseWriter, r *http.Request){
+        file, header, err := r.FormFile("file")
+        if err != nil{
+            log.Printf("error getting a file for the provided form key :%s", err)
+            return
+        }
+        defer file.Close()
+        out, pathError := os.Create("/tmp/uploadedFile")
+        if pathError != nil{
+            log.Printf("error creating a file for writing :%s ", pathError)
+            return
+        }
+        defer out.Close()
+        _, copyFileError := io.Copy(out, file)
+        if copyFileError != nil{
+            log.Printf("error occurred while file copy : %s", copyFileError)
+        }
+        fmt.Fprintf(w, "File uploaded successfully :%s ",header.Filename)
+    }
+
+    func index(w http.ResponseWriter, r *http.Request){
+        parsedTemplate, _ := template.ParseFiles("templates/upload-file.html")
+        parsedTemplate.Execute(w, nil)
+    }
+
+    func main(){
+        http.HandleFunc("/", index)
+        http.HandleFunc("/upload", fileHandler)
+    
+        err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, nil)
+        if err != nil{
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+        </code></pre>
+        <p>Если все готово, структура каталогов должна выглядеть следующим образом</p>
+        <p><img src="static/images/picture2-12.png"</p>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run upload-file.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.
+    Просмотр <span>http://localhost:8080</span> покажет нам форму загрузки файла, как показано на следующем
+    снимке экрана:</p>
+
+<p><img src="static/images/picture2-13.png"</p>
+<p>Нажатие кнопки «Отправить» после выбора файла приведет к созданию файла на
+    сервере с именем «uploadedFile» в каталоге /tmp. Вы можете увидеть это,
+    выполнив следующие команды:</p>
+<p class="terminal">
+    $ cd ~ && cd /tmp && ls -l
+    total 0
+    -rw-r--r-- 1 ArpitAggaraval wheel 0 Apr  4 23:24 uploadedFile
+    $ /tmp
+</p>
+<p>Кроме того, при успешной загрузке в браузере отобразится сообщение, как показано на
+    следующем снимке экрана:</p>
+<p><img src="static/images/picture2-14.png"</p>
+<p>Давайте разберемся в написанной нами программе Go:</p>
+<p>Мы определили обработчик fileHandler(), который получает файл по запросу, считывает его
+    содержимое и в конечном итоге записывает его в файл на сервере. Поскольку этот обработчик выполняет множество
+    функций, давайте рассмотрим его подробно:</p>
+<ul>
+    <li><i>file, header, err := r.FormFile("file")</i>: Здесь мы вызываем обработчик FormFile в
+        HTTP-запросе, чтобы получить файл для предоставленного ключа формы.</li>
+    <li><i>if err != nil { log.Printf("ошибка при получении файла для предоставленного ключа формы: ", err) return
+    }</i>: Здесь мы проверяем, есть ли какие-либо проблемы при получении файла по
+    запросу. Если да, зарегистрируйте ошибку и выйдите с кодом состояния 1.</li>
+    <li><i>defer file.Close()</i>: оператор defer закрывает файл после возврата из функции
+        .</li>
+    <li><i>out, pathError := os.Create("/tmp/uploadedFile")</i>: Здесь мы создаем файл с именем
+        uploadedFile внутри каталога /tmp с режимом 666, что означает, что клиент может читать
+        и записывать, но не может выполнить файл.</li>
+    <li><i>if pathError != nil { log.Printf("ошибка создания файла для записи: ", pathError) return
+    }</i>: Здесь мы проверяем, нет ли проблем с созданием файла на
+    сервере. Если они есть, зарегистрируйте ошибку и выйдите с кодом состояния 1.</li>
+    <li><i>_, copyFileError := io.Copy(out, file)</i>: Здесь мы копируем содержимое из полученного файла
+        в файл, который мы создали внутри каталога /tmp.</li>
+    <li><i>fmt.Fprintf(w, «Файл успешно загружен:%s», header.Filename)</i>: здесь мы пишем сообщение
+        вместе с именем файла в поток ответов HTTP.</li>
+</ul>
+
 </body>
 </html>
