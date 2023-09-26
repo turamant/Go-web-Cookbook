@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="static/css/main.css">
+    <title>Глава 2</title>
+</head>
+
+<body>
+    <h1>Работа с сессиями, обработка ошибок и кеширование в Go</h1>
+
+<p>В этой главе мы рассмотрим следующие рецепты:</p>
+<ul>
+    <li>Создание первого сеанса HTTP.</li>
+    <li>Управление сеансом HTTP с помощью Redis.</li>
+    <li>Создание первого файла cookie HTTP.</li>
+    <li>Реализация кэширования в Go.</li>
+    <li>Реализация обработки ошибок HTTP в Go.</li>
+    <li>Реализация входа и выхода из системы в веб-приложении.</li>
+</ul>
+
+<h2>Введение</h2>
+<p>Иногда нам хотелось бы сохранить такую ​​информацию, как пользовательские данные, на
+    уровне приложения, а не сохранять ее в базе данных, чего можно легко достичь с помощью
+    сеансов и файлов cookie. Разница между ними заключается в том, что сеансы хранятся на
+    стороне сервера, а файлы cookie — на стороне клиента. Нам также может потребоваться кэшировать
+    статические данные, чтобы избежать ненужных вызовов базы данных или веб-службы, а также реализовать
+    обработку ошибок при разработке веб-приложения. Зная концепции,
+    рассмотренные в этой главе, мы сможем довольно
+    легко реализовать все эти функции.</p>
+<p>В этой главе мы начнем с создания сеанса HTTP, затем узнаем, как можно
+    управлять им с помощью <i>Redis</i>, создавать файлы cookie, кэшировать ответы HTTP, реализовывать
+    обработку ошибок и, в конечном итоге, заканчивать реализацией механизмов входа и выхода из системы в
+    Go.</p>
+
+<h2>Создание вашей первой HTTP-сессии</h2>
+<p>HTTP — это протокол без сохранения состояния, что означает, что каждый раз, когда клиент получает веб-страницу, клиент
+    открывает отдельное соединение с сервером, и сервер отвечает на него, не
+    сохраняя никакой записи предыдущего запроса клиента. Итак, если мы хотим реализовать
+    механизм, при котором сервер узнает о запросе, отправленном ему клиентом,
+    мы можем реализовать его с помощью сеанса.</p>
+<p>Когда мы работаем с сессиями, клиентам достаточно отправить идентификатор, и данные
+    по соответствующему идентификатору загружаются с сервера. Есть три способа реализовать
+    это в веб-приложении:</p>
+<ul>
+    <li>Файлы cookie</li>
+    <li>Скрытые поля формы</li>
+    <li>Перезапись URL-адресов</li>
+</ul>
+
+<p>В этом рецепте мы реализуем сеанс с использованием файлов cookie HTTP.</p>
+
+<h3>Как это сделать...</h3>
+<ol>
+    <li>Установите пакет github.com/gorilla/sessions с помощью команды go get следующим образом:</li>
+    <p class="terminal">
+        $ go get github.com/gorilla/sessions
+    </p>
+    <li>Создайте http-session.go, где мы создадим хранилище файлов cookie Gorilla для сохранения и
+        получения информации о сеансе, определяя три обработчика — /login, /home и /logout —
+        где мы будем создавать действительный файл cookie сеанса, записывая ответ на HTTP-запрос.
+        поток ответов и аннулирование файла cookie сеанса соответственно следующим образом:</li>
+    <pre><code>
+    package main
+
+    import(
+        "fmt"
+        "log"
+        "net/http"
+        "github.com/gorilla/sessions"
+    )
+
+    const(
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    var store *sessions.CookieStore
+    
+    func init(){
+        store = sessions.NewCookieStore([]byte("secret-key"))
+    }
+
+    func home(w http.ResponseWriter, r *http.Request){
+        session, _ := store.Get(r, "session-name")
+        var authenticated interface{} = session.Values["authenticated"]
+        if authenticated != nil{
+            isAuthenticated := session.Values["authenticated"].(bool)
+            if !isAuthenticated{
+                http.Error(w, "You are unauthorized to view the page",http.StatusForbidden)
+                return
+            }
+            fmt.Fprintln(w, "Home Page")
+        }else{
+            http.Error(w, "You are unauthorized to view the page",http.StatusForbidden)
+            return
+        }
+    }
+
+    func login(w http.ResponseWriter, r *http.Request){
+        session, _ := store.Get(r, "session-name")
+        session.Values["authenticated"] = true
+        session.Save(r, w)
+        fmt.Fprintln(w, "You have successfully logged in.")
+    }
+
+    func logout(w http.ResponseWriter, r *http.Request){
+        session, _ := store.Get(r, "session-name")
+        session.Values["authenticated"] = false
+        session.Save(r, w)
+        fmt.Fprintln(w, "You have successfully logged out.")
+    }
+
+    func main(){
+        http.HandleFunc("/home", home)
+        http.HandleFunc("/login", login)
+        http.HandleFunc("/logout", logout)
+    
+        err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, nil)
+        if err != nil{
+            log.Fatal("error starting http server :%s", err)
+            return
+        }
+    }
+    </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run http-session.go
+    </p>
+</ol>
+
+<h3>Как это работает ....</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Затем мы выполним пару команд, чтобы увидеть, как работает сеанс.</p>
+<p>Сначала мы получим доступ к /home, выполнив следующую команду:</p>
+<p class="terminal">
+    $ curl -X GET http://localhost:8080/home
+</p>
+<p>Это приведет к появлению сообщения о несанкционированном доступе с сервера, как показано на
+    следующем снимке экрана:</p>
+
+<p class="terminal">
+    $ curl -X GET http://localhost:8080/home
+    
+    You are unauthorized to view the Page
+</p>
+<p>Это связано с тем, что сначала нам нужно войти в приложение, которое создаст
+    идентификатор сеанса, который сервер проверит, прежде чем предоставить доступ к любой веб-странице. Итак, авторизуемся
+    в приложении:</p>
+<p class="terminal">
+    $ curl -X GET -i http://localhost:8080/login
+</p>
+<p>Выполнение предыдущей команды даст нам файл cookie, который необходимо установить в качестве
+    заголовка запроса для доступа к любой веб-странице:</p>
+
+<p><img src="static/images/picture3-1.png"/></p>
+
+<p>Далее мы будем использовать предоставленный файл cookie для доступа к /home следующим образом:</p>
+<p class="terminal">
+    $ curl --cookie "session-name=MTUyMzEwMTI3NXxEdi1CQkFFQ180SUFBUkFCRUFBQUpmLUNBQUVHYzNSe
+</p>
+<p>В результате домашняя страница появляется в ответ от сервера:</p>
+
+<p><img src="static/images/picture3-2.png"/></p>
+<p>Давайте разберемся в написанной нами программе Go:</p>
+<ul>
+    <li>Используя хранилище var *sessions.CookieStore, мы объявили частное хранилище файлов cookie для хранения
+        сеансов с использованием безопасных файлов cookie.</li>
+    <li>Используя func init() { store = session.NewCookieStore([]byte("secret-key")) }, мы определили
+        функцию init(), которая запускается перед main(), чтобы создать новое хранилище файлов cookie и назначить его
+        хранилищу.</li>
+        <p class="note">
+            init() вызывается всегда, независимо от того, есть ли основная функция или нет, поэтому, если вы импортируете пакет, имеющий
+функцию инициализации, он будет выполнен.
+        </p>
+    <li>Затем мы определили домашний обработчик, в котором мы получаем сеанс из хранилища файлов cookie для
+        заданного имени после добавления его в реестр с помощью store.Get и извлекаем значение
+        аутентифицированного ключа из кеша. Если это правда, то мы записываем домашнюю страницу в
+        поток ответов HTTP; в противном случае пишем: Вы не авторизованы для просмотра
+        страницы. сообщение вместе с HTTP-кодом 403.</li>
+    <li>Далее мы определили обработчик входа в систему, в котором мы снова получаем сеанс, устанавливаем аутентифицированный
+        ключ со значением true, сохраняем его и, наконец, пишем «Вы успешно вошли
+        в систему.» в поток ответов HTTP.</li>
+    <li>Далее мы определили обработчик выхода из системы, в котором мы получаем сеанс, устанавливаем аутентифицированный ключ
+        со значением false, сохраняем его и, наконец, пишем: Вы успешно вышли
+        из системы. в поток ответов HTTP.</li>
+    <li>Наконец, мы определили функцию main(), в которой мы сопоставили все обработчики home, login и logout с
+        /home, /login и /logout соответственно и запустили HTTP-сервер на localhost:8080.</li>
+</ul>
+
+<h2>Управление сеансом HTTP с помощью Redis</h2>
+<p>При работе с распределенными приложениями нам, вероятно, придется реализовать балансировку нагрузки без сохранения состояния для пользователей внешнего интерфейса. Это сделано для того, чтобы мы могли сохранять
+    информацию о сеансе в базе данных или файловой системе, чтобы мы могли идентифицировать пользователя
+    и получить его информацию в случае выключения или перезапуска сервера.</p>
+<p>Мы решим эту проблему в рамках рецепта, используя Redis в качестве постоянного хранилища для сохранения сеанса.</p>
+<h3>Подготовка</h3>
+<p>Поскольку в предыдущем рецепте мы уже создали переменную сеанса с использованием
+    хранилища файлов cookie Gorilla, мы просто расширим этот рецепт, чтобы сохранять информацию о сеансе в Redis, а не
+    хранить ее на сервере.</p>
+<p>Существует несколько реализаций хранилища сеансов Gorilla, которые вы можете найти по адресу
+    https://github.com/gorilla/sessions#store-implementations. Поскольку мы используем Redis в качестве
+    внутреннего хранилища, мы будем использовать https://github.com/boj/redistore, который зависит от
+    библиотеки Redigo Redis для хранения сеанса.</p>
+<p>В этом рецепте предполагается, что Redis и Redis Browser установлены и работают
+    локально на портах 6379 и 4567 соответственно.</p>
+
+<h3>Как это сделать...</h3>
+<ol>
+    <li>Установите gopkg.in/boj/redistore.v1 и github.com/gorilla/sessions с помощью команды go get
+        следующим образом:</li>
+        <p class="terminal">
+            $ go get gopkg.in/boj/redistore.v1
+            $ go get github.com/gorilla/sessions
+        </p>
+    <li>Создайте http-session-redis.go, где мы создадим RedisStore для хранения и получения
+        переменных сеанса следующим образом:</li>
+        <pre><code>
+    package main
+
+    import(
+        "fmt"
+        "log"
+        "net/http"
+        "github.com/gorilla/sessions"
+        redisStore "gopkg.in/boj/redistore.v1"
+    )
+
+    const(
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    var store *redisStore.RediStore
+    var err error
+    
+    func init(){
+        store, err = redisStore.NewRediStore(10, "tcp", ":6379", "",[]byte("secret-key"))
+        if err != nil{
+            log.Fatal("error getting redis store : ", err)
+        }
+    }
+
+    func home(w http.ResponseWriter, r *http.Request){
+        session, _ := store.Get(r, "session-name")
+        var authenticated interface{} = session.Values["authenticated"]
+        if authenticated != nil{
+            isAuthenticated := session.Values["authenticated"].(bool)
+            if !isAuthenticated{
+                http.Error(w, "You are unauthorized to view the page",http.StatusForbidden)
+                return
+            }
+        fmt.Fprintln(w, "Home Page")
+        } else {
+            http.Error(w, "You are unauthorized to view the page",http.StatusForbidden)
+            return
+        }
+    }
+
+    func login(w http.ResponseWriter, r *http.Request){
+        session, _ := store.Get(r, "session-name")
+        session.Values["authenticated"] = true
+        if err = sessions.Save(r, w); err != nil{
+            log.Fatalf("Error saving session: %v", err)
+        }
+        fmt.Fprintln(w, "You have successfully logged in.")
+    }
+
+    func logout(w http.ResponseWriter, r *http.Request){
+        session, _ := store.Get(r, "session-name")
+        session.Values["authenticated"] = false
+        session.Save(r, w)
+        fmt.Fprintln(w, "You have successfully logged out.")
+    }
+
+    func main(){
+        http.HandleFunc("/home", home)
+        http.HandleFunc("/login", login)
+        http.HandleFunc("/logout", logout)
+    
+        err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, nil)
+        defer store.Close()
+        if err != nil{
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+        </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run http-session-redis.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Затем мы выполним пару команд, чтобы увидеть, как работает сеанс.</p>
+<p>Сначала мы получим доступ к /home, выполнив следующую команду:</p>
+<p class="terminal">
+    $ curl -X GET http://localhost:8080/home
+</p>
+<p>Это приведет к появлению сообщения о несанкционированном доступе с сервера, как показано на
+    следующем снимке экрана:</p>
+<p class="terminal">
+    $ curl -XGET http://localhost:8080/home
+
+    You are unaithirized to view the page
+</p>
+<p>Это связано с тем, что сначала нам нужно войти в приложение, которое создаст
+    идентификатор сеанса, который сервер проверит, прежде чем предоставить доступ к любой веб-странице. Итак, авторизуемся
+    в приложении:</p>
+<p class="terminal">
+    $ curl -X GET -i http://localhost:8080/login
+</p>
+<p>Выполнение предыдущей команды даст нам файл cookie, который необходимо установить в качестве
+    заголовка запроса для доступа к любой веб-странице:</p>
+
+<p><img src="static/images/picture3-3.png"/></p>
+<p>После выполнения предыдущей команды будет создан и сохранен файл cookie в Redis,
+    который вы можете увидеть, выполнив команду из redis-cli или в браузере Redis,
+    как показано на следующем снимке экрана:</p>
+<p><img src="static/images/picture3-4.png"/></p>
+<p>Далее мы будем использовать файл cookie, предоставленный для доступа к /home, следующим образом:</p>
+<p class="terminal">
+    $ curl --cookie "session-name=MTUyMzEwNDUyM3xOd3dBTkV4T1JrdzNURFkyUkVWWlQxWklUekpKVUVOW
+</p>
+<p>В результате домашняя страница появляется в ответ от сервера:</p>
+<p><img src="static/images/picture3-5.png"/></p>
+<p>Давайте разберемся, какие изменения мы внесли в этот рецепт:</p>
+<ol>
+    <li>Используя var store *redisStore.RediStore, мы объявили частный RediStore для хранения
+        сессий в Redis.</li>
+    <li>Затем мы обновили функцию init(), чтобы создать NewRediStore с размером и
+        максимальным количеством простаивающих соединений, равным 10, и присвоили ее хранилищу.
+        Если при создании магазина возникает ошибка, то мы логируем ошибку и выходим с кодом состояния
+        1.</li>
+    <li>Наконец, мы обновили функцию main(), добавив оператор defer store.Close(), который
+        закрывает хранилище Redis после возврата из функции.</li>
+</ol>
+
+
+<h2>Создание вашего первого HTTP-файла cookie....................</h2>
+
+</body>
+</html>
