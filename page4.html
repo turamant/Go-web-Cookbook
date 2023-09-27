@@ -217,7 +217,8 @@
         наоборот.</li>
 </ol>
 
-<h2>Создание вашего первого метода HTTP POST.........................</h2>
+<h2>Создание вашего первого метода HTTP POST</h2>
+
 <p>Всякий раз, когда нам нужно отправить данные на сервер посредством асинхронного вызова или
     через форму HTML, мы используем реализацию метода HTTP POST,
     которую мы рассмотрим в этом рецепте.</p>
@@ -331,11 +332,751 @@
 </ol>
 
 <h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Затем выполнение запроса POST из командной строки следующим образом добавит сотрудника
+    в список с идентификатором 3 и вернет список сотрудников в качестве ответа:</p>
 
+<p class="terminal">
+    $ curl -H "Content-Type: application/json" -X POST -d '{"Id":"3", "firstName":"Quux",
+            "lastName":"Corge"}' http://localhost:8080/employee/add
 
+</p>
+<p>Это показано на следующем скриншоте:</p>
+<p><img src="static/images/picture4-1.png"</p>
+<p>Давайте разберемся с изменениями, которые мы внесли в этот рецепт:</p>
+<ol>
+    <li>Во-первых, мы добавили еще один маршрут с именем addEmployee, который выполняет
+        обработчик addEmployee для каждого POST-запроса для шаблона URL-адреса /employee/add.</li>
+    <li>Затем мы определили обработчик addEmployee, который в основном декодирует
+        данные о сотруднике, поступающие как часть запроса POST, с помощью обработчика NewDecoder встроенного пакета кодирования/json Go, добавляет их в исходный статический массив сотрудника и записывает их
+        . в поток ответов HTTP.</li>
+</ol>
 
+<h2>Создание вашего первого метода HTTP PUT</h2>
+<p>Всякий раз, когда мы хотим обновить запись, которую мы создали ранее, или хотим создать
+    новую запись, если она не существует, что часто называется Upsert, мы используем
+    реализацию метода HTTP PUT, которую мы рассмотрим в этом рецепте.</p>
 
+<ol>
+    <li>Установите пакет github.com/gorilla/mux с помощью команды go get следующим образом:</li>
+    <p class="terminal">
+        $ go get github.com/gorilla/mux
+    </p>
+    <li>Создайте http-rest-put.go, где мы определим дополнительный маршрут, поддерживающий
+        метод HTTP PUT, и обработчик, который либо обновляет сведения о сотруднике для
+        предоставленного идентификатора, либо добавляет сотрудника в исходный статический массив сотрудников; если идентификатор
+        не существует, маршалируйте его в JSON и записывайте в поток ответов HTTP
+        следующим образом:</li>
+        <pre><code>
+    package main
 
+    import(
+        "encoding/json"
+        "log"
+        "net/http"
+        "github.com/gorilla/mux"
+    )
+
+    const(
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    type Route struct{
+        Name string
+        Method string
+        Pattern string
+        HandlerFunc http.HandlerFunc
+    }
+
+    type Routes []Route
+    
+    var routes = Routes{
+        Route{
+            "getEmployees",
+            "GET",
+            "/employees",
+            getEmployees,
+        },
+        Route{
+            "addEmployee",
+            "POST",
+            "/employee/add",
+            addEmployee,
+        },
+        Route{
+            "updateEmployee",
+            "PUT",
+            "/employee/update",
+            updateEmployee,
+        },
+    }
+
+    type Employee struct{
+        Id string `json:"id"`
+        FirstName string `json:"firstName"`
+        LastName string `json:"lastName"`
+    }
+
+    type Employees []Employee
+    
+    var employees []Employee
+    
+    func init(){
+        employees = Employees{
+            Employee{Id: "1", FirstName: "Foo", LastName: "Bar"},
+            Employee{Id: "2", FirstName: "Baz", LastName: "Qux"},
+        }
+    }
+
+    func getEmployees(w http.ResponseWriter, r *http.Request){
+        json.NewEncoder(w).Encode(employees)
+    }
+
+    func updateEmployee(w http.ResponseWriter, r *http.Request){
+        employee := Employee{}
+        err := json.NewDecoder(r.Body).Decode(&employee)
+        if err != nil{
+            log.Print("error occurred while decoding employee data :: ", err)
+            return
+        }
+        var isUpsert = true
+        for idx, emp := range employees{
+            if emp.Id == employee.Id{
+                isUpsert = false
+                log.Printf("updating employee id :: %s with firstName as :: %s and lastName as:: %s ",
+                                                    employee.Id, employee.FirstName, employee.LastName)
+                employees[idx].FirstName = employee.FirstName
+                employees[idx].LastName = employee.LastName
+                break
+            }
+        }
+        if isUpsert{
+            log.Printf("upserting employee id :: %s with firstName as :: %s and lastName as:: %s ", 
+                                                    employee.Id, employee.FirstName, employee.LastName)
+            employees = append(employees, Employee{Id: employee.Id, 
+                                            FirstName: employee.FirstName, LastName: employee.LastName})
+        }
+        json.NewEncoder(w).Encode(employees)
+    }
+
+    func addEmployee(w http.ResponseWriter, r *http.Request){
+        employee := Employee{}
+        err := json.NewDecoder(r.Body).Decode(&employee)
+        if err != nil{
+            log.Print("error occurred while decoding employee data :: ", err)
+            return
+        }
+        log.Printf("adding employee id :: %s with firstName as :: %s and lastName as :: %s ", employee.Id, 
+                                                                    employee.FirstName, employee.LastName)
+        employees = append(employees, Employee{Id: employee.Id, FirstName: employee.FirstName,
+                                                                    LastName: employee.LastName})
+        json.NewEncoder(w).Encode(employees)
+    }
+
+    func AddRoutes(router *mux.Router) *mux.Router{
+        for _, route := range routes{
+            router.Methods(route.Method).Path(route.Pattern).Name(route.Name).Handler(route.HandlerFunc)
+        }
+        return router
+    }
+
+    func main(){
+        muxRouter := mux.NewRouter().StrictSlash(true)
+    
+        router := AddRoutes(muxRouter)
+    
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+        if err != nil{
+            log.Fatal("error starting http server :: ", err)
+            return
+        }
+    }
+        </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run http-rest-put.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Затем, выполнив запрос PUT из командной строки следующим образом, обновится
+    имя и фамилия для сотрудника с идентификатором 1:</p>
+<p class="terminal">
+    $ curl -H "Content-Type: application/json" -X PUT -d '{"Id":"1", "firstName":"Grault",
+        "lastName":"Garply"}' http://localhost:8080/employee/update
+</p>
+<p>Это можно увидеть на следующем скриншоте:</p>
+<p><img src="static/images/picture4-2.png"</p>
+
+<p>Если мы выполним запрос PUT для сотрудника с идентификатором 3 из командной строки следующим образом
+    , он добавит в массив еще одного сотрудника, поскольку сотрудника с идентификатором 3 нет,
+    что демонстрирует сценарий обновления:</p>
+<p class="terminal">
+    $ curl -H "Content-Type: application/json" -X PUT -d '{"Id":"3", "firstName":"Quux", 
+            "lastName":"Corge"}' http://localhost:8080/employee/update
+</p>
+<p>Это можно увидеть на следующем скриншоте:</p>
+<p><img src="static/images/picture4-3.png"</p>
+<p>Давайте разберемся с изменениями, которые мы внесли в этот рецепт:</p>
+<ol>
+    <li>Во-первых, мы добавили еще один маршрут с именем updateEmployee, который выполняет
+        обработчик updateEmployee для каждого запроса PUT для шаблона URL-адреса /employee/update.</li>
+    <li>Затем мы определили обработчик updateEmployee, который в основном декодирует
+        данные о сотрудниках, поступающие как часть запроса PUT, с использованием обработчика NewDecoder встроенного
+        пакета кодирования/json Go, перебирает массив сотрудников, чтобы узнать,
+        запрошен ли идентификатор сотрудника. существует в исходном статическом массиве сотрудников, который
+        мы также можем назвать сценарием UPDATE или UPSERT, выполняет необходимое
+        действие и записывает ответ в поток ответов HTTP.</li>
+</ol>
+
+<h2>Создание вашего первого метода HTTP  DELETE</h2>
+
+<p>Всякий раз, когда мы хотим удалить запись, которая больше не требуется, мы используем
+    реализацию метода HTTP DELETE, которую мы рассмотрим в этом рецепте.</p>
+
+<h3>Как это сделать...</h3>
+<ol>
+    <li>Установите пакет github.com/gorilla/mux, используя команду go get следующим образом:</li>
+    <p class="terminal">
+        $ go get github.com/gorilla/mux
+    </p>
+    <li>Создайте http-rest-delete.go, где мы определим маршрут, поддерживающий
+        метод HTTP DELETE, и обработчик, который удаляет сведения о сотруднике для предоставленного идентификатора
+        из статического массива сотрудников, маршалирует массив в JSON и записывает его в
+        Поток ответа HTTP, например:</li>
+        <pre><code>
+package main
+
+import(
+    "encoding/json"
+    "log"
+    "net/http"
+    "github.com/gorilla/mux"
+)
+
+const(
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+)
+
+type Route struct{
+    Name string
+    Method string
+    Pattern string
+    HandlerFunc http.HandlerFunc
+}
+
+type Routes []Route
+
+var routes = Routes{
+    Route{
+        "getEmployees",
+        "GET",
+        "/employees",
+        getEmployees,
+    },
+    Route{
+        "addEmployee",
+        "POST",
+        "/employee/add/",
+        addEmployee,
+    },
+    Route{
+        "deleteEmployee",
+        "DELETE",
+        "/employee/delete",
+        deleteEmployee,
+    },
+}
+
+type Employee struct{
+    Id          string `json:"id"`
+    FirstName   string `json:"firstName"`
+    LastName    string `json:"lastName"`
+}
+
+type Employees []Employee
+
+var employees []Employee
+
+func init(){
+    employees = Employees{
+        Employee{Id: "1", FirstName: "Foo", LastName: "Bar"},
+    Employee{Id: "2", FirstName: "Baz", LastName: "Qux"},
+    }
+}
+
+func getEmployees(w http.ResponseWriter, r *http.Request){
+    json.NewEncoder(w).Encode(employees)
+}
+
+func deleteEmployee(w http.ResponseWriter, r *http.Request){
+    employee := Employee{}
+    err := json.NewDecoder(r.Body).Decode(&employee)
+    if err != nil{
+        log.Print("error occurred while decoding employee data :: ", err)
+        return
+    }
+    log.Printf("deleting employee id :: %s with firstName as :: %s and lastName as :: %s ", employee.Id, 
+                                                                employee.FirstName, employee.LastName)
+    index := GetIndex(employee.Id)
+    employees = append(employees[:index], employees[index+1:]...)
+    json.NewEncoder(w).Encode(employees)
+}
+
+func GetIndex(id string) int{
+    for i := 0; i < len(employees); i++{
+        if employees[i].Id == id{
+            return i
+        }
+    }
+    return -1
+}
+
+func addEmployee(w http.ResponseWriter, r *http.Request){
+    employee := Employee{}
+    err := json.NewDecoder(r.Body).Decode(&employee)
+    if err != nil{
+        log.Print("error occurred while decoding employee data :: ", err)
+        return
+    }
+    log.Printf("adding employee id :: %s with firstName as :: %s and lastName as :: %s ", employee.Id, 
+                                                                employee.FirstName, employee.LastName)
+    employees = append(employees, Employee{Id: employee.Id, FirstName: employee.FirstName,
+                                                                    LastName: employee.LastName})
+    json.NewEncoder(w).Encode(employees)
+}
+
+func AddRoutes(router *mux.Router) *mux.Router{
+    for _, route := range routes{
+        router.Methods(route.Method).Path(route.Pattern).Name(route.Name).Handler(route.HandlerFunc)
+    }
+    return router
+}
+
+func main(){
+    muxRouter := mux.NewRouter().StrictSlash(true)
+    router := AddRoutes(muxRouter)
+    
+    err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+    if err != nil{
+        log.Fatal("error starting http server :: ", err)
+        return
+    }
+}
+        </code></pre>
+    <li>Запустите программу с помощью следующей команды:</li>
+    <p class="terminal">
+        $ go run http-rest-delete.go
+    </p>
+</ol>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Затем, выполнив запрос DELETE из командной строки следующим образом, мы удалит сотрудника
+    с идентификатором 1 и предоставит нам обновленный список сотрудников:</p>
+
+<p class="terminal">
+    curl -H "Content-Type: application/json" -X DELETE -d '{"Id":"1", "firstName": "Foo",
+            "lastName":"Bar"}' http://localhost:8080/employee/delete</p>
+<p>Это можно увидеть на следующем скриншоте:</p>
+<p><img src="static/images/picture4-4.png" </p>
+
+<ol>
+    <li>Во-первых, мы добавили еще один маршрут с именем deleteEmployee, который выполняет
+        обработчик deleteEmployee для каждого запроса DELETE для шаблона URL-адреса /employee/delete.</li>
+    <li>Во-первых, мы добавили еще один маршрут с именем deleteEmployee, который выполняет
+        обработчик deleteEmployee для каждого запроса DELETE для шаблона URL-адреса /employee/delete.</li>
+</ol>
+
+<h2>Управление версиями вашего REST API</h2>
+
+<p>Когда вы создаете RESTful API для обслуживания внутреннего клиента, вам, вероятно, не придется
+    беспокоиться о версии вашего API. Если пойти еще дальше, если вы контролируете
+    всех клиентов, обращающихся к вашему API, то же самое может быть правдой.</p>
+<p>Однако в случае, если у вас есть общедоступный API или API, где вы не можете
+    контролировать каждого клиента, использующего его, может потребоваться управление версиями вашего API, поскольку
+    бизнесу необходимо развиваться, и это мы рассмотрим в этом рецепте.</p>
+
+<h3>Как это сделать ...</h3>
+<ol>
+    <li>Установите пакет github.com/gorilla/mux, используя команду go get следующим образом:</li>
+        <p class="terminal">
+           $ go get github.com/gorilla/mux
+        </p>
+    <li>Создайте http-rest-versioning.go, где мы определим две версии одного и того же URL-
+        пути, поддерживающие метод HTTP GET, причем одна будет иметь префикс v1, а другая
+        — префикс v2 в маршруте, как показано ниже:</li>
+        <pre><code>
+package main
+
+import(
+    "encoding/json"
+    "log"
+    "net/http"
+    "strings"
+    "github.com/gorilla/mux"
+)
+
+const(
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+)
+
+type Route struct{
+    Name        string
+    Method      string
+    Pattern     string
+    HandlerFunc http.HandlerFunc
+}
+
+type Routes []Route
+
+var routes = Routes{
+    Route{
+        "getEmployees",
+        "GET",
+        "/employees",
+        getEmployees,
+    },
+}
+
+type Employee struct{
+    Id          string `json:"id"`
+    FirstName   string `json:"firstName"`
+    LastName    string `json:"lastName"`
+}
+
+type Employees  []Employee
+
+var employees   []Employee
+
+var employeesV1 []Employee
+
+var employeesV2 []Employee
+
+func init(){
+    employees = Employees{
+        Employee{Id: "1", FirstName: "Foo", LastName: "Bar"},
+    }
+    employeesV1 = Employees{
+        Employee{Id: "1", FirstName: "Foo", LastName: "Bar"},
+        Employee{Id: "2", FirstName: "Baz", LastName: "Qux"},
+    }
+    employeesV2 = Employees{
+        Employee{Id: "1", FirstName: "Baz", LastName: "Qux"},
+        Employee{Id: "2", FirstName: "Quux", LastName: "Quuz"},
+    }
+}
+
+func getEmployees(w http.ResponseWriter, r *http.Request){
+    if strings.HasPrefix(r.URL.Path, "/v1"){
+        json.NewEncoder(w).Encode(employeesV1)
+    } else if strings.HasPrefix(r.URL.Path, "/v2"){
+        json.NewEncoder(w).Encode(employeesV2)
+    } else {
+        json.NewEncoder(w).Encode(employees)
+    }
+}
+
+func AddRoutes(router *mux.Router) *mux.Router{
+    for _, route := range routes{
+        router.Methods(route.Method).Path(route.Pattern).Name(route.Name).Handler(route.HandlerFunc)
+    }
+    return router
+}
+
+func main(){
+    muxRouter := mux.NewRouter().StrictSlash(true)
+    router := AddRoutes(muxRouter)
+    // v1
+    AddRoutes(muxRouter.PathPrefix("/v1").Subrouter())
+    // v2
+    AddRoutes(muxRouter.PathPrefix("/v2").Subrouter())
+
+    err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+    if err != nil{
+        log.Fatal("error starting http server :: ", err)
+        return
+    }
+}
+        </code></pre>
+    <li>Запустите программу с помощью следующей команды:</li>
+        <p class="terminal">
+            $ go run http-rest-versioning.go
+        </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Затем выполнение запроса GET с префиксом пути /v1 из командной строки следующим образом
+    предоставит вам список одного набора сотрудников:</p>
+    <p class="terminal">
+        $ curl -X GET http://localhost:8080/v1/employees
+
+        [{"id":"1","firstName":"Foo","lastName":"Bar"},
+                        {"id":"2","firstName":"Baz","lastName":"...
+
+    </p>
+<p>Здесь выполнение запроса GET с префиксом пути /v2 предоставит вам список другого набора
+    сотрудников, как показано ниже:</p>
+    <p class="terminal">
+        $ curl -X GET http://localhost:8080/v2/employees
+        
+        [{"id":"1","firstName":"Baz","lastName":"Qux"},
+                {"id":"2","firstName":"Quux","lastName": ...
+
+    </p>
+<p>Иногда при разработке URL-адреса REST мы предпочитаем возвращать данные по умолчанию, если клиент
+    запрашивает конечную точку без указания версии в пути URL-адреса. Чтобы
+    включить его, мы изменили обработчик getEmployees, чтобы он проверял префикс в
+    URL-адресе и действовал соответствующим образом. Таким образом, выполнение запроса GET без префикса пути из
+    командной строки следующим образом даст вам список с одной записью, которую мы можем назвать
+    стандартным или начальным ответом конечной точки REST под названием:</p>
+<p class="terminal">
+    $ curl -X GET http://localhost:8080/employees
+    
+    [{"id":"1","firstName":"Foo","lastName":"Bar"}]
+
+</p>
+<p>Давайте разберемся с изменениями, которые мы внесли в этот рецепт:</p>
+<ol>
+    <li>Сначала мы определили один маршрут с именем getEmployees, который выполняет
+        обработчик getEmployees для каждого запроса GET для шаблона URL-адреса /employees.</li>
+    <li>Затем мы создали три массива, а именно: сотрудники, сотрудникиV1 и сотрудникиV2, которые
+        возвращаются в ответ на вызов HTTP GET для шаблонов URL-адресов /employees,
+        /v1/employees и /v2/employees соответственно.</li>
+    <li>Далее мы определили обработчик getEmployes, в котором мы проверяем префикс в
+        URL-пути и выполняем на его основе действие.</li>
+    <li>Затем мы определили вспомогательную функцию AddRoutes, которая перебирает
+        определенный нами массив маршрутов, добавляет его в маршрутизатор gorilla/mux и возвращает объект Router.</li>
+    <li>Наконец, мы определили функцию main(), где мы создаем экземпляр маршрутизатора gorilla/mux, используя
+        обработчик NewRouter() с поведением косой черты в конце для новых маршрутов как true, и добавляем
+        к нему маршруты, вызывая вспомогательную функцию AddRoutes, передавая маршрутизатор по умолчанию и два
+        подмаршрутизатора . , один с префиксом v1, а другой с префиксом v2.</li>
+</ol>
+
+<h2>Создание вашего первого REST-клиента</h2>
+<p>Сегодня большинство приложений, взаимодействующих с серверами, используют службы RESTful. В зависимости
+    от наших потребностей мы используем эти сервисы через JavaScript, jQuery или через
+    клиент REST.</p>
+<p>В этом рецепте мы напишем REST-клиент, используя пакет <span>//gopkg.in/resty.v1</span>,
+    который сам по себе вдохновлен клиентом REST Ruby для использования сервисов RESTful.</p>
+
+<h3>Готовимся ...</h3>
+<p>Запустите http-rest-get.go, который мы создали в одном из предыдущих рецептов, в отдельном
+    терминале, выполнив следующую команду:</p>
+    <p class="terminal">
+        $ go run http-rest-get.go
+    </p>
+    <p class="note">
+        См. рецепт «Создание первого метода HTTP GET».
+    </p>
+
+<p>Убедитесь, что служба /employees работает локально на порту 8080, выполнив
+    следующую команду:</p>
+<p class="terminal">
+    $ curl -X GET http://localhost:8080/employees
+
+</p>
+
+<p>Это должно вернуть следующий ответ:</p>
+<p class="terminal">
+    [{"id":"1","firstName":"Foo","lastName":"Bar"},
+                    {"id":"2","firstName":"Baz","lastName":"...
+
+</p>
+
+<h3>Как это сделать ...</h3>
+<ol>
+    <li>Установите пакеты github.com/gorilla/mux и gopkg.in/resty.v1 с помощью
+        команды go get следующим образом:</li>
+        <p class="terminal">
+            $ go get github.com/gorilla/mux
+            $ go get -u gopkg.in/resty.v1
+        </p>
+    <li>Создайте http-rest-client.go, где мы определим обработчики, вызывающие обработчики resty,
+        такие как GET, POST, PUT и DELETE, получим ответ от службы REST и запишем
+        его в поток ответов HTTP, как показано ниже:</li>
+        <pre><code>
+package main
+
+import(
+    "encoding/json"
+    "fmt"
+    "log"
+    "net/http"
+    "github.com/gorilla/mux"
+    resty "gopkg.in/resty.v1"
+)
+
+const(
+    CONN_HOST = "localhost"
+    CONN_PORT = "8090"
+)
+
+const WEB_SERVICE_HOST string = "http://localhost:8080"
+
+type Employee struct{
+    Id string `json:"id"`
+    FirstName string `json:"firstName"`
+    LastName string `json:"lastName"`
+}
+
+func getEmployees(w http.ResponseWriter, r *http.Request){
+    response, err := resty.R().Get(WEB_SERVICE_HOST + "/employees")
+    if err != nil{
+        log.Print("error getting data from the web service :: ", err)
+        return
+    }
+    printOutput(response, err)
+    fmt.Fprintf(w, response.String())
+}
+
+func addEmployee(w http.ResponseWriter, r *http.Request){
+    employee := Employee{}
+    decodingErr := json.NewDecoder(r.Body).Decode(&employee)
+    if decodingErr != nil{
+        log.Print("error occurred while decoding employee data :: ", decodingErr)
+        return
+    }
+    log.Printf("adding employee id :: %s with firstName as :: %s and lastName as :: %s ", employee.Id, 
+                                                                employee.FirstName, employee.LastName)
+    response, err := resty.R().SetHeader("Content-Type", "application/json").
+        SetBody(Employee{Id: employee.Id, FirstName:employee.FirstName, LastName: employee.LastName}).
+                                                                Post(WEB_SERVICE_HOST + "/employee/add")
+    
+    if err != nil{
+        log.Print("error occurred while adding employee :: ", err)
+        return
+    }
+    printOutput(response, err)
+    mt.Fprintf(w, response.String())
+}
+
+func updateEmployee(w http.ResponseWriter, r *http.Request){
+    employee := Employee{}
+    decodingErr := json.NewDecoder(r.Body).Decode(&employee)
+    if decodingErr != nil{
+        log.Print("error occurred while decoding employee data :: ", decodingErr)
+        return
+    }
+
+    log.Printf("updating employee id :: %s with firstName as :: %s and lastName as :: %s ", employee.Id,
+                                                                employee.FirstName, employee.LastName)
+    response, err := resty.R().
+            SetBody(Employee{Id: employee.Id, FirstName:employee.FirstName, LastName: employee.LastName}).
+                                                                Put(WEB_SERVICE_HOST + "/employee/update")
+
+    if err != nil{
+        log.Print("error occurred while updating employee :: ", err)
+        return
+    }
+    printOutput(response, err)
+    fmt.Fprintf(w, response.String())
+}
+
+func deleteEmployee(w http.ResponseWriter, r *http.Request){
+    employee := Employee{}
+    decodingErr := json.NewDecoder(r.Body).Decode(&employee)
+    if decodingErr != nil{
+        log.Print("error occurred while decoding employee data :: ", decodingErr)
+        return
+    }
+    log.Printf("deleting employee id :: %s with firstName as :: %s and lastName as :: %s ", employee.Id,
+                                                            employee.FirstName, employee.LastName)
+    response, err := resty.R().
+        SetBody(Employee{Id: employee.Id, FirstName: employee.FirstName, LastName: employee.LastName}).
+                                                            Delete(WEB_SERVICE_HOST + "/employee/delete")
+    if err != nil{
+        log.Print("error occurred while deleting employee :: ", err)
+        return
+    }
+    printOutput(response, err)
+    fmt.Fprintf(w, response.String())
+}
+
+func printOutput(resp *resty.Response, err error){
+    log.Println(resp, err)
+}
+
+func main(){
+    router := mux.NewRouter().StrictSlash(false)
+    router.HandleFunc("/employees", getEmployees).Methods("GET")
+
+    employee := router.PathPrefix("/employee").Subrouter()
+    employee.HandleFunc("/add", addEmployee).Methods("POST")
+    employee.HandleFunc("/update", updateEmployee).Methods("PUT")
+    employee.HandleFunc("/delete", deleteEmployee).Methods("DELETE")
+
+    err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+    if err != nil{
+        log.Fatal("error starting http server : ", err)
+        return
+    }
+}
+        </code></pre>
+    <li>Запустите программу с помощью следующей команды:</li>
+        <p class="terminal">
+            $ go run http-rest-client.go
+        </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8090.</p>
+<p>Затем выполнение запроса GET к клиенту REST из командной строки следующим образом предоставит
+    вам список всех сотрудников службы:</p>
+
+<p class="terminal">
+    $ curl -X GET http://localhost:8090/employees
+    
+    [{"id":"1","firstName":"Foo","lastName":"Bar"},
+        {"id":"2","firstName":"Baz","lastName":" ...
+
+</p>
+<p>Аналогично запустите http-rest-post.go, который мы создали в одном из предыдущих рецептов, в
+    отдельном терминале, выполнив следующую команду:</p>
+<p class="terminal">
+    $ go run http-rest-post.go
+
+</p>
+
+<p>Выполните запрос POST к клиенту REST из командной строки следующим образом:</p>
+<p class="terminal">
+    $ curl -H "Content-Type: application/json" -X POST -d '{"Id":"3",
+             "firstName":"Quux", "lastNa ...
+    
+    [{"id":"1","firstName":"Foo","lastName":"Bar"},
+                {"id":"2","firstName":"Baz","lastName":" ...
+
+</p>
+<p>Это добавит сотрудника в исходный статический список и вернет обновленный список
+    сотрудников, который будет выглядеть, как показано на следующем снимке экрана:</p>
+    <p><img src="static/images/picture4-5.png" </p>
+<p>Давайте разберемся в написанной нами программе:</p>
+<ol>
+    <li>Используя import («encoding/json» «fmt» «log» «net/http» «github.com/gorilla/mux» resty
+        «gopkg.in/resty.v1»), мы импортировали github.com/gorilla/mux в создайте Gorilla Mux Router
+        и gopkg.in/resty.v1 с псевдонимом пакета resty, который является REST-клиентом Go и
+        имеет различные обработчики для использования веб-службы RESTful.</li>
+    <li>Используя const WEB_SERVICE_HOST string = «http://localhost:8080», мы объявили
+        полный URL-адрес хоста веб-службы RESTful.</li>
+        <p class="note">
+            В зависимости от размера проекта вы можете переместить строку WEB_SERVICE_HOST в файл констант или в файл свойств
+, что поможет вам переопределить ее значение во время выполнения.
+        </p>
+    <li>Затем мы определили обработчик getEmployees, в котором мы создаем новый объект запроса resty,
+        вызывая его обработчик R(), вызываем метод Get, который выполняет запрос HTTP GET,
+        получает ответ и записывает его в ответ HTTP.</li>
+    <li>Аналогичным образом мы определили еще три обработчика, которые выполняют запросы POST, PUT и DELETE
+        к службе RESTful, а также метод main(), в котором мы создаем экземпляр маршрутизатора gorilla/mux
+        и регистрируем URL-путь /employees с помощью обработчика getEmployee и /employee/. add,
+        /employee/update и /employee/delete с помощью
+        обработчиков addEmployee, updateEmployee и deleteEmployee соответственно.</li>
+</ol>
+
+<h2>Создание вашего первого клиента AngularJS</h2>
+<p>...........................</p>
 
 
 
