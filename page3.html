@@ -324,6 +324,7 @@
 <p>Далее мы будем использовать файл cookie, предоставленный для доступа к /home, следующим образом:</p>
 <p class="terminal">
     $ curl --cookie "session-name=MTUyMzEwNDUyM3xOd3dBTkV4T1JrdzNURFkyUkVWWlQxWklUekpKVUVOW
+
 </p>
 <p>В результате домашняя страница появляется в ответ от сервера:</p>
 <p><img src="static/images/picture3-5.png"/></p>
@@ -340,7 +341,603 @@
 </ol>
 
 
-<h2>Создание вашего первого HTTP-файла cookie....................</h2>
+<h2>Создание вашего первого HTTP-файла cookie</h2>
+<p>Файлы cookie играют важную роль при хранении информации на стороне клиента, и мы можем
+    использовать их значения для идентификации пользователя. По сути, файлы cookie были изобретены для решения
+    проблемы запоминания информации о пользователе или аутентификации с постоянным входом в систему,
+    что означает, что веб-сайты могут запоминать личность участника между
+    сеансами.</p>
+<p>Файлы cookie — это простые текстовые файлы, которые веб-браузеры создают, когда вы посещаете веб-сайты в
+    Интернете. Ваше устройство хранит текстовые файлы локально, позволяя вашему браузеру получать доступ к файлам
+    cookie и передавать данные обратно на исходный веб-сайт, и они сохраняются в парах имя-значение.</p>
 
+
+<h3>Как это сделать ...</h3>
+<ol>
+    <li>Установите пакет github.com/gorilla/securecookie с помощью команды go get следующим образом:</li>
+    <p class="terminal">
+        $ go get github.com/gorilla/securecookie
+    </p>
+    <li>Создайте http-cookie.go, где мы создадим безопасный файл cookie Gorilla для хранения и
+        получения файлов cookie следующим образом:</li>
+        <pre><code>
+    package main
+
+    import(
+        "fmt"
+        "log"
+        "net/http"
+        "github.com/gorilla/securecookie"
+    )
+
+    const(
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    var cookieHandler *securecookie.SecureCookie
+    
+    func init(){
+        cookieHandler = securecookie.New(securecookie.GenerateRandomKey(64), securecookie.GenerateRandomKey(32))
+    }
+
+    func createCookie(w http.ResponseWriter, r *http.Request){
+        value := map[string]string{
+            "username": "Foo",
+        }
+        
+        base64Encoded, err := cookieHandler.Encode("key", value)
+        if err == nil{
+            cookie := &http.Cookie{
+                Name: "first-cookie",
+                Value: base64Encoded,
+                Path: "/",
+            }
+        http.SetCookie(w, cookie)
+        }
+
+        w.Write([]byte(fmt.Sprintf("Cookie created.")))
+    }
+
+    func readCookie(w http.ResponseWriter, r *http.Request){
+        log.Printf("Reading Cookie..")
+        cookie, err := r.Cookie("first-cookie")
+        if cookie != nil && err == nil{
+            value := make(map[string]string)
+            if err = cookieHandler.Decode("key", cookie.Value, &value);err == nil{
+                w.Write([]byte(fmt.Sprintf("Hello %v \n",value["username"])))
+            }
+        } else {
+            log.Printf("Cookie not found..")
+            w.Write([]byte(fmt.Sprint("Hello")))
+        }
+    }
+    
+    func main(){
+        http.HandleFunc("/create", createCookie)
+        http.HandleFunc("/read", readCookie)
+    
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)
+        if err != nil{
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+        </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run http-cookie.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>При просмотре <span>http://localhost:8080/read</span> в браузере отобразится Hello, как вы можете видеть на
+    следующем снимке экрана:</p>
+<p><img src="static/images/picture3-6.png"/></p>
+<p>Далее мы получим доступ к <span>http://localhost:8080/create</span>, который создаст файл cookie с именем
+    first-cookie и отобразит сообщение «Cookie создано» в браузере:</p>
+<p><img src="static/images/picture3-7.png"/></p>
+<p>Теперь при последующем доступе к <span>http://localhost:8080/read</span> будет использоваться first-cookie для отображения
+    Hello, за которым следует значение first-cookie, как показано ниже:</p>
+<p><img src="static/images/picture3-8.png"/></p>
+<p>Давайте разберемся в написанной нами программе:</p>
+<ul>
+    <li>С помощью импорта ("fmt" "log" "net/http" "github.com/gorilla/securecookie
+        ") мы ввели дополнительный пакет
+        —github.com/gorilla/securecookie, который мы будем использовать для кодирования и декодирования
+        аутентифицированных и зашифрованных файлов. значения файлов cookie.</li>
+    <li>Используя var cookieHandler *securecookie.SecureCookie, мы объявили частный безопасный
+        файл cookie.</li>
+    <li>Затем мы обновили функцию init(), чтобы создать SecureCookie, передавая 64-байтовый хеш-
+        ключ, который используется для аутентификации значений с использованием HMAC, и 32-байтовый блочный ключ,
+        который используется для шифрования значений.</li>
+    <li>Затем мы определили обработчик createCookie, в котором мы создаем файл cookie в кодировке Base64
+        с ключом в качестве имени пользователя и значением Foo, используя обработчик Encode
+        gorilla/securecookie. Затем мы добавляем заголовок Set-Cookie к предоставленным
+        заголовкам ResponseWriter и записываем созданный файл cookie. сообщение в HTTP-ответ.</li>
+    <li>Далее мы определили обработчик readCookie, в котором мы извлекаем из запроса файл cookie
+        , который является первым файлом cookie в нашем коде, получаем для него значение и записываем его в
+        ответ HTTP.</li>
+    <li>Наконец, мы определили функцию main(), в которой сопоставили все обработчики — createCookie и
+        readCookie — с /create и /read соответственно, и запустили HTTP-сервер на
+        localhost:8080.</li>
+</ul>
+
+<h2>Реализация кеширования в Go</h2>
+<p>Кэширование данных в веб-приложении иногда необходимо, чтобы избежать
+    повторного запроса статических данных из базы данных или внешнего сервиса. Go не предоставляет
+    встроенного пакета для кэширования ответов, но поддерживает его через внешние пакеты.</p>
+<p>Существует ряд пакетов, таких как <i>https://github.com/coocood/freecache</i> и
+    <i>https://github.com/patrickmn/go-cache</i>, которые могут помочь в реализации кэширования, и в этом
+    рецепте мы будем используя <i>https://github.com/patrickmn/go-cache</i> для его реализации.</p>
+
+<h3>Как это сделать...</h3>
+<ol>
+    <li>Установите пакет github.com/patrickmn/go-cache с помощью команды go get следующим образом:</li>
+    <p class="terminal">
+        $ go get github.com/patrickmn/go-cache
+    </p>
+    <li>Создайте http-caching.go, где мы создадим кеш и заполним его данными при
+        загрузке сервера следующим образом:</li>
+    <pre><code>
+    package main
+
+    import(
+        "fmt"
+        "log"
+        "net/http"
+        "time"
+        "github.com/patrickmn/go-cache"
+    )
+
+    const(
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    var newCache *cache.Cache
+
+    func init(){
+        newCache = cache.New(5*time.Minute, 10*time.Minute)
+        newCache.Set("foo", "bar", cache.DefaultExpiration)
+    }
+
+    func getFromCache(w http.ResponseWriter, r *http.Request){
+        foo, found := newCache.Get("foo")
+        if found{
+            log.Print("Key Found in Cache with value as :: ",
+            foo.(string))
+            fmt.Fprintf(w, "Hello "+foo.(string))
+        }else {
+            log.Print("Key Not Found in Cache :: ", "foo")
+            fmt.Fprintf(w, "Key Not Found in Cache")
+        }
+    }
+
+    func main(){
+        http.HandleFunc("/", getFromCache)
+    
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)
+        if err != nil{
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+    </code></pre>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run http-caching.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>При запуске в кеш будет добавлен ключ с именем foo и значением bar.</p>
+<p>При просмотре <span>http://localhost:8080/</span> значение ключа будет прочитано из кеша и добавлено к
+    Hello, как показано на следующем снимке экрана:</p>
+
+<p><img src="static/images/picture3-9.png"/></p>
+<p>В нашей программе мы указали срок действия данных кэша как пять минут,
+    а это значит, что ключа, который мы создали в кэше при запуске сервера,
+    через пять минут там не будет. Таким образом, повторный доступ к тому же URL-адресу через пять минут приведет к
+    возврату с сервера «Ключ не найден в кэше» следующим образом:</p>
+<p><img src="static/images/picture3-10.png"/></p>
+<p>Давайте разберемся в написанной нами программе:</p>
+<ol>
+    <li>Используя var newCache *cache.Cache, мы объявили частный кеш.</li>
+    <li>Затем мы обновили функцию init(), где мы создаем кеш со
+        сроком действия пять минут и интервалом очистки 10 минут, а также добавляем элемент в кеш
+        с ключом foo со значением bar и значением срока действия 0. , что означает, что
+        мы хотим использовать время истечения срока действия кэша по умолчанию.</li>
+    <p class="note">
+        Если срок действия меньше единицы (или NoExpiration), срок действия элементов в кэше никогда не истекает (по умолчанию) и их
+необходимо удалить вручную. Если интервал очистки меньше единицы, элементы с истекшим сроком действия не удаляются из кэша
+перед вызовом c.DeleteExpired().
+    </p>
+    <li>Далее мы определили обработчик getFromCache, с помощью которого извлекаем значение ключа
+        из кеша. Если он найден, мы записываем его в HTTP-ответ; в противном случае мы записываем
+        сообщение «Ключ не найден в кэше» в ответ HTTP.</li>
+</ol>
+
+<h2>Реализация обработки ошибок HTTP в Go</h2>
+<p>Реализация обработки ошибок в любом веб-приложении является одним из основных аспектов, поскольку
+    помогает быстрее устранять и исправлять ошибки. Обработка ошибок означает, что всякий раз, когда
+    в приложении возникает ошибка, она должна где-то регистрироваться, либо в файле, либо в базе
+    данных, с соответствующим сообщением об ошибке вместе со трассировкой стека.</p>
+<p>В Go это можно реализовать несколькими способами. Один из способов — написать собственные обработчики,
+    которые мы рассмотрим в этом рецепте.</p>
+
+<h3>Как это сделать ...</h3>
+<ol>
+    <li>Установите пакет github.com/gorilla/mux с помощью команды go get следующим образом:</li>
+    <p class="terminal">
+        $ go get github.com/gorilla/mux
+    </p>
+    <li>Создайте http-error-handling.go, где мы создадим собственный обработчик, который действует как
+        оболочка для обработки всех HTTP-запросов, как показано ниже:</li>
+        <pre><code>
+    package main
+
+    import(
+        "errors"
+        "fmt"
+        "log"
+        "net/http"
+        "strings"
+        "github.com/gorilla/mux"
+    )
+
+    const(
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    type NameNotFoundError struct{
+        Code int
+        Err error
+    }
+
+    func (nameNotFoundError NameNotFoundError) Error() string{
+        return nameNotFoundError.Err.Error()
+    }
+
+    type WrapperHandler func(http.ResponseWriter, *http.Request)error
+
+    func (wrapperHandler WrapperHandler) ServeHTTP(w http.ResponseWriter, r *http.Request){
+        err := wrapperHandler(w, r)
+        if err != nil{
+            switch e := err.(type){
+                case NameNotFoundError:
+                    log.Printf("HTTP %s - %d", e.Err, e.Code)
+                    http.Error(w, e.Err.Error(), e.Code)
+                default:
+                    http.Error(w, http.StatusText(http.StatusInternalServerError),http.StatusInternalServerError)
+            }
+        }
+    }
+
+    func getName(w http.ResponseWriter, r *http.Request) error{
+        vars := mux.Vars(r)
+        name := vars["name"]
+        if strings.EqualFold(name, "foo"){
+            fmt.Fprintf(w, "Hello "+name)
+            return nil
+        } else {
+            return NameNotFoundError{500, errors.New("Name Not Found")}
+        }
+    }
+
+    func main(){
+        router := mux.NewRouter()
+        router.Handle("/employee/get/{name}", WrapperHandler(getName)).Methods("GET")
+    
+        err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+        if err != nil{
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+        </code></pre>
+    <li>Запустите программу с помощью следующей команды:</li>
+    <p class="terminal">
+        $ go run http-error-handling.go
+    </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Затем, просматривая <span>http://localhost:8080/employee/get/foo</span>, мы получим сообщение Hello, за которым следует
+    имя сотрудника с кодом состояния 200. , в качестве ответа в браузере:</p>
+<p><img src="static/images/picture3-11.png"/></p>
+<p>С другой стороны, доступ к <span>http://localhost:8080/employee/get/bar</span> вернет нам
+    ошибку HTTP с сообщением «Имя не найдено» и кодом ошибки <i>500</i>:</p>
+<p><img src="static/images/picture3-12.png"/></p>
+<p>Давайте разберемся в написанной нами программе:</p>
+<ol>
+    <li>Мы определили структуру NameNotFoundError с двумя полями — Code типа int и Err типа
+        error, которая представляет ошибку со связанным кодом состояния HTTP, следующим образом:</li>
+        <pre><code>
+    type NameNotFoundError struct{
+        Code int
+        Err error
+    }
+        </code></pre>
+    <li>Затем мы разрешили NameNotFoundError удовлетворять интерфейсу ошибок следующим образом:</li>
+    <pre><code>
+        func (nameNotFoundError NameNotFoundError) Error() string{
+            return nameNotFoundError.Err.Error()
+        }
+    </code></pre>
+    <li>Далее мы определили пользовательский тип <i>WrapperHandler</i>, который представляет собой функцию Go, которая
+        принимает любой обработчик, принимающий func(http.ResponseWriter, *http.Request) в качестве входных
+        параметров и возвращающий ошибку.</li>
+    <li>Затем мы определили обработчик ServeHTTP, который вызывает обработчик, который мы передаем
+        WrapperHandler, передавая ему (http.ResponseWriter, *http.Request) в качестве параметров, и
+        проверяет, есть ли какие-либо ошибки, возвращаемые обработчиком. Если они есть, то он обрабатывает
+        их соответствующим образом, используя регистр переключателя, следующим образом:</li>
+        <pre><code>
+    if err != nil {
+        switch e := err.(type){
+            case NameNotFoundError:
+                log.Printf("HTTP %s - %d", e.Err, e.Code)
+                http.Error(w, e.Err.Error(), e.Code)
+            default:
+                http.Error(w, http.StatusText(http.StatusInternalServerError),http.StatusInternalServerError)
+        }
+    }
+        </code></pre>
+    <li>Далее мы определили обработчик getName, который извлекает переменные пути запроса, получает значение
+        переменной name и проверяет, соответствует ли имя foo. Если да, то
+        в HTTP-ответе пишется Hello, за которым следует имя; в противном случае возвращается
+        структура NameNotFoundError со значением поля Code 500 и значением поля err ошибки
+        с текстом Name Not Found.</li>
+    <li>Наконец, мы определили функцию main(), в которой зарегистрировали WrapperHandler в качестве обработчика, который будет
+        вызываться для шаблона URL-адреса как /get/{name}.</li>
+</ol>
+
+<h2>Реализация входа и выхода из веб-приложения</h2>
+<p>Всякий раз, когда мы хотим, чтобы к приложению имели доступ зарегистрированные пользователи, мы должны
+    реализовать механизм, который запрашивает учетные данные пользователя, прежде чем разрешить ему просматривать
+    любые веб-страницы, что мы и рассмотрим в этом рецепте.</p>
+
+<h3>Подготовка ...</h3>
+<p>Поскольку мы уже создали HTML-форму в одном из наших предыдущих рецептов, мы просто
+    обновим ее, чтобы реализовать механизмы входа и выхода из системы с использованием
+    пакета gorilla/securecookie.</p>
+<p class="note">
+    См. рецепт «Реализация входа и выхода из системы в веб-приложении» в главе 2 «Работа с шаблонами, статическими
+файлами и HTML-формами».
+</p>
+
+<ol>
+    <li>Установите github.com/gorilla/mux и github.com/gorilla/securecookie с помощью
+        команды go get следующим образом:</li>
+        <p class="terminal">
+            $ go get github.com/gorilla/mux
+            $ go get github.com/gorilla/securecookie
+        </p>
+    <li>Создайте файл home.html в каталоге шаблонов следующим образом:</li>
+        <p class="terminal">
+            $ mkdir templates && cd templates && touch home.html.
+        </p>
+    <li>Скопируйте следующий контент в home.html:</li>
+    <pre><code>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Welcome {{.userName}}!&lt;/h1&gt;
+        &lt;form method="post" action="/logout"&gt;
+            &lt;button type="submit"&gt;Logout&lt;/button&gt;
+        &lt;/form&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+    </code></pre>
+    <p>В предыдущем шаблоне мы определили заполнитель {{.userName}}, значения которого
+        будут заменены механизмом шаблонов во время выполнения, и кнопку выхода из системы. Нажав
+        кнопку «Выход», клиент выполнит POST-вызов действия формы,
+        в нашем случае это /logout.</p>
+    <li>В предыдущем шаблоне мы определили заполнитель {{.userName}}, значения которого
+        будут заменены механизмом шаблонов во время выполнения, и кнопку выхода из системы. Нажав
+        кнопку «Выход», клиент выполнит POST-вызов действия формы,
+        в нашем случае это /logout.</li>
+        <pre><code>
+    package main
+
+    import(
+        "html/template"
+        "log"
+        "net/http"
+        "github.com/gorilla/mux"
+        "github.com/gorilla/securecookie"
+    )
+
+    const(
+        CONN_HOST = "localhost"
+        CONN_PORT = "8080"
+    )
+
+    var cookieHandler = securecookie.New(securecookie.GenerateRandomKey(64),securecookie.GenerateRandomKey(32))
+
+    func getUserName(request *http.Request) (userName string){
+        cookie, err := request.Cookie("session")
+        if err == nil{
+            cookieValue := make(map[string]string)
+            err = cookieHandler.Decode("session", cookie.Value, &cookieValue)
+            if err == nil{
+                userName = cookieValue["username"]
+            }
+        }
+        return userName
+    }
+
+    func setSession(userName string, response http.ResponseWriter){
+        value := map[string]string{
+            "username": userName,
+        }
+        encoded, err := cookieHandler.Encode("session", value)
+        if err == nil{
+            cookie := &http.Cookie{
+                Name: "session",
+                Value: encoded,
+                Path: "/",
+            }
+            http.SetCookie(response, cookie)
+        }
+    }
+
+    func clearSession(response http.ResponseWriter){
+        cookie := &http.Cookie{
+            Name: "session",
+            Value: "",
+            Path: "/",
+            MaxAge: -1,
+        }
+        http.SetCookie(response, cookie)
+    }
+
+    func login(response http.ResponseWriter, request *http.Request){
+        username := request.FormValue("username")
+        password := request.FormValue("password")
+        target := "/"
+        if username != "" && password != ""{
+            setSession(username, response)
+            target = "/home"
+        }
+        http.Redirect(response, request, target, 302)
+    }
+
+    func logout(response http.ResponseWriter, request *http.Request){
+        clearSession(response)
+        http.Redirect(response, request, "/", 302)
+    }
+
+    func loginPage(w http.ResponseWriter, r *http.Request){
+        parsedTemplate, _ := template.ParseFiles("templates/login-form.html")
+        parsedTemplate.Execute(w, nil)
+    }
+
+    func homePage(response http.ResponseWriter, request *http.Request){
+        userName := getUserName(request)
+        if userName != ""{
+            data := map[string]interface{}{
+                "userName": userName,
+            }
+            parsedTemplate, _ := template.ParseFiles("templates/home.html")
+            parsedTemplate.Execute(response, data)
+        } else {
+            http.Redirect(response, request, "/", 302)
+        }
+    }
+    
+    func main(){
+        var router = mux.NewRouter()
+
+        router.HandleFunc("/", loginPage)
+        router.HandleFunc("/home", homePage)
+        router.HandleFunc("/login", login).Methods("POST")
+        router.HandleFunc("/logout", logout).Methods("POST")
+
+        http.Handle("/", router)
+    
+        err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, nil)
+        if err != nil{
+            log.Fatal("error starting http server : ", err)
+            return
+        }
+    }
+        </code></pre>
+        <p>Если все готово, структура каталогов должна выглядеть следующим образом:</p>
+        <p><img src="static/images/picture3-13.png"/></p>
+    <li>Run the program with the following command:</li>
+        <p class="terminal">
+            $ go run html-form-login-logout.go
+        </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>Затем при просмотре http://localhost:8080 нам отобразится форма входа, как показано на следующем
+    снимке экрана:</p>
+<p><img src="static/images/picture3-14.png"/></p>   
+<p>Отправка формы после ввода имени пользователя Foo и случайного пароля приведет
+    к отображению приветствия Foo! сообщение в браузере и создайте файл cookie с именем
+    сеанса, который управляет состоянием входа/выхода пользователя:</p>
+    <p><img src="static/images/picture3-15.png"/></p>  
+
+<p>Теперь при каждом последующем запросе к <span>http://localhost:8080/home</span> будет отображаться сообщение Welcome
+    Foo! сообщение в браузере до тех пор, пока не появится файл cookie с именем сеанса.</p>
+<p>Далее, доступ к <span>http://localhost:8080/home</span> после очистки файла cookie перенаправит нас на
+    <span>http://localhost:8080/</span> и покажет нам форму входа:</p>
+<p><img src="static/images/picture3-16.png"/></p> 
+<p>Давайте разберемся в написанной нами программе.</p>
+<ol>
+    <li>Используя var cookieHandler = securecookie.New(securecookie.
+        GenerateRandomKey(64), securecookie.GenerateRandomKey(32)), мы создаем безопасный файл
+        cookie, передавая хэш-ключ в качестве первого аргумента и ключ блока в качестве второго
+        аргумента. Хэш-ключ используется для аутентификации значений с использованием HMAC, а блочный
+        ключ используется для шифрования значений.</li>
+    <li>Далее мы определили обработчик getUserName, в котором мы получаем файл cookie из HTTP-
+        запроса, инициализируем карту cookieValue строковых ключей со строковыми значениями, декодируем файл cookie,
+        получаем значение для имени пользователя и возвращаем результат.</li>
+    <li>Затем мы определили обработчик setSession, в котором мы создаем и инициализируем карту с
+        ключом и значением в качестве имени пользователя, сериализуем ее, подписываем ее с помощью кода аутентификации сообщения,
+        кодируем ее с помощью обработчика cookieHandler.Encode, создаем новый файл cookie HTTP и запишите
+        его в поток ответов HTTP.</li>
+    <li>Далее мы определили ClearSession, который по сути устанавливает значение файла cookie как
+        пустое и записывает его в поток ответов HTTP.</li>
+    <li>Далее мы определили обработчик входа в систему, где мы получаем имя пользователя и пароль из
+        HTTP-формы, проверяем, не пусты ли оба, затем вызываем обработчик setSession и перенаправляем
+        на /home, в противном случае перенаправляем на корневой URL-адрес /.</li>
+    <li>Далее мы определили обработчик выхода из системы, в котором мы очищаем значения сеанса, вызывая
+        обработчик ClearSession, и перенаправляем на корневой URL-адрес.</li>
+    <li>Далее мы определили обработчик loginPage, в котором мы анализируем файл login-form.html, возвращаем новый
+        шаблон с именем и его содержимым, вызываем обработчик Execute для проанализированного
+        шаблона, который генерирует выходные данные HTML, и записываем его в
+        поток ответов HTTP.</li>
+    <li>Далее мы определили обработчик домашней страницы, который получает имя пользователя из HTTP-
+        запроса, вызывающего обработчик getUserName. Затем мы проверяем, не пуст ли он и
+        присутствует ли значение cookie. Если имя пользователя не пустое, мы анализируем
+        home.html, вставляем имя пользователя в виде карты данных, генерируем вывод HTML и записываем его
+        в поток ответов HTTP; в противном случае мы перенаправляем его на корневой URL-адрес /.</li>
+</ol>
+<p>Наконец, мы определили метод main(), с которого начинаем выполнение программы. Поскольку этот
+    метод выполняет множество функций, давайте рассмотрим его построчно:</p>
+<ul>
+    <li><i>var router = mux.NewRouter()</i>: Здесь мы создаем новый экземпляр маршрутизатора.</li>
+    <li><i>router.HandleFunc("/", loginPage)</i>: здесь мы регистрируем обработчик loginPageHandler
+        с шаблоном / URL, используя HandleFunc пакета gorilla/mux, что означает, что
+        обработчик loginPage выполняется путем передачи (http.ResponseWriter, *http. Request) в качестве
+        параметров всякий раз, когда мы обращаемся к URL-адресу HTTP с помощью шаблона /.</li>
+    <li><i>router.HandleFunc("/home", homePage)</i>: здесь мы регистрируем
+        обработчик homePageHandler с шаблоном URL-адреса /home, используя HandleFunc пакета gorilla/mux,
+        что означает, что обработчик homePage выполняется путем передачи (http.ResponseWriter,
+        *http.Request) в качестве параметров всякий раз, когда мы обращаемся к URL-адресу HTTP с
+        шаблоном /home.</li>
+    <li><i>router.HandleFunc("/login", login).Methods("POST")</i>: Здесь мы регистрируем обработчик loginHandler
+        с шаблоном URL-адреса /login, используя HandleFunc
+        пакета gorilla/mux, что означает выполнение обработчика входа в систему. передавая ему
+        (http.ResponseWriter, *http.Request) в качестве параметров всякий раз, когда мы обращаемся к
+        URL-адресу HTTP с шаблоном /login.</li>
+    <li><i>router.HandleFunc("/logout", logout).Methods("POST")</i>: Здесь мы регистрируем
+        обработчик logoutHandler с шаблоном URL-адреса /logout, используя HandleFunc
+        пакета gorilla/mux, что означает выполнение обработчика выхода из системы. передавая
+        ему (http.ResponseWriter, *http.Request) в качестве параметров всякий раз, когда мы обращаемся к
+        URL-адресу HTTP с шаблоном /logout.</li>
+    <li><i>http.Handle("/", router)</i>: здесь мы регистрируем маршрутизатор для шаблона URL-адреса /
+        с помощью HandleFunc пакета net/http, что означает, что все запросы с
+        шаблоном URL-адреса / обрабатываются обработчиком маршрутизатора.</li>
+    <li><i>err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, nil)</i>: Здесь мы вызываем
+        http.ListenAndServe для обслуживания HTTP-запросов, которые обрабатывают каждое входящее соединение
+        в отдельной Goroutine. ListenAndServe принимает два параметра — адрес сервера и
+        обработчик, где адрес сервера — localhost:8080, а обработчик — ноль, что
+        означает, что мы просим сервер использовать DefaultServeMux в качестве обработчика.</li>
+    <li><i>if err != nil { log.Fatal("ошибка запуска http-сервера: ", err) return}</i>: Здесь мы проверяем,
+        есть ли проблемы с запуском сервера. Если они есть, зарегистрируйте ошибку
+        и выйдите с кодом состояния 1.</li>
+</ul>
 </body>
 </html>

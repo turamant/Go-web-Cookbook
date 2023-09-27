@@ -1,14 +1,11 @@
 &lt;html&gt;
-    &lt;head&gt;
-        &lt;meta charset="utf-8"&gt;
-        &lt;title&gt;File Upload&lt;/title&gt;
-    &lt;/head&gt;
-    &lt;body&gt;
-        &lt;form action="/upload" method="post" enctype="multipart/form-data"&gt;
-            &lt;label for="file"&gt;File:&lt;/label&gt;
-            &lt;input type="file" name="file" id="file"&gt;
-            
-            &lt;input type="submit" name="submit" value="Submit"&gt;
-        &lt;/form&gt;
-    &lt;/body&gt;
+&lt;head&gt;
+&lt;title&gt;&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Welcome {{.userName}}!&lt;/h1&gt;
+&lt;form method="post" action="/logout"&gt;
+&lt;button type="submit"&gt;Logout&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
 &lt;/html&gt;
