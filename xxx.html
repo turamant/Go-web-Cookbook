@@ -1,35 +1,23 @@
-&lt;html&gt;
-&lt;head&gt;
-&lt;title&gt;VueJs Client&lt;/title&gt;
-&lt;script type = "text/javascript" src = "https://cdnjs.
-cloudflare.com/ajax/libs/vue/2.4.0/vue.js"&gt;&lt;/script&gt;
-&lt;script type = "text/javascript" src="https://cdn.
-jsdelivr.net/npm/vue-resource@1.5.0"&gt;&lt;/script&gt;
-&lt;/head&gt;
-&lt;body&gt;
-&lt;div id = "form"&gt;
-&lt;h1&gt;{{ message }}&lt;/h1&gt;
-&lt;table&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;label for="id"&gt;Id&lt;/label&gt;&lt;/td&gt;
-&lt;td&gt;&lt;input type="text" value="" v-model="id"/&gt;&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;label for="firstName"&gt;FirstName&lt;/label&gt;&lt;/td&gt;
-&lt;td&gt;&lt;input type="text" value="" v-model="firstName"/&gt;
-&lt;td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;label for="lastName"&gt;LastName&lt;/label&gt;&lt;/td&gt;
-&lt;td&gt; &lt;input type="text" value="" v-model="lastName" /&gt;
-&lt;/td&gt;
-&lt;/tr&gt;
-&lt;tr&gt;
-&lt;td&gt;&lt;a href="#" class="btn" @click="addEmployee"&gt;Add
-&lt;/a&gt;&lt;/td&gt;
-&lt;/tr&gt;
-&lt;/table&gt;
+import React, { Component, PropTypes } from 'react'
+export default class AddEmployee extends React.Component
+{
+render()
+{
+return
+(
+&lt;div&gt;
+&lt;input type = 'text' ref = 'input' /&gt;
+&lt;button onClick = {(e) =&gt; this.handleClick(e)}&gt;
+Add
+&lt;/button&gt;
 &lt;/div&gt;
-&lt;script type = "text/javascript" src = "main.js"&gt;&lt;/script&gt;
-&lt;/body&gt;
-&lt;/html&gt;
+)
+}
+handleClick(e)
+{
+const node = this.refs.input
+const text = node.value.trim()
+this.props.addEmployee(text)
+node.value = ''
+}
+}

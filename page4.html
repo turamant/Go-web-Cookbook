@@ -1425,29 +1425,29 @@ return
             </code></pre>
             <p>Скопируйте следующее содержимое в responsejs-client/app/comComponents/add-employee.jsx:</p>
             <pre><code>
-                import React, { Component, PropTypes } from 'react'
-export default class AddEmployee extends React.Component
-{
-render()
-{
-return
-(
-<div>
-<input type = 'text' ref = 'input' />
-<button onClick = {(e) => this.handleClick(e)}>
-Add
-</button>
-</div>
-)
-}
-handleClick(e)
-{
-const node = this.refs.input
-const text = node.value.trim()
-this.props.addEmployee(text)
-node.value = ''
-}
-}
+    import React, { Component, PropTypes } from 'react'
+    export default class AddEmployee extends React.Component
+    {
+    render()
+    {
+    return
+    (
+    &lt;div&gt;
+    &lt;input type = 'text' ref = 'input' /&gt;
+    &lt;button onClick = {(e) =&gt; this.handleClick(e)}&gt;
+    Add
+    &lt;/button&gt;
+    &lt;/div&gt;
+    )
+    }
+    handleClick(e)
+    {
+    const node = this.refs.input
+    const text = node.value.trim()
+    this.props.addEmployee(text)
+    node.value = ''
+    }
+    }
             </code></pre>
             <p>Если все готово, структура каталогов должна выглядеть следующим образом:</p>
         <p><img src="static/images/picture4-6.png"/></p>
@@ -1482,7 +1482,7 @@ node.value = ''
 <p>Это будет рядом с недавно добавленным, а именно:</p>
 <p class="terminal">
     [{"id":"1","firstName":"Foo","lastName":"Bar"},{"id":"2","firstName":"Baz",
-                                                                    "lastName":" ...
+                                                                    "lastName":"..."} ...
 
 </p>
 
@@ -1704,7 +1704,7 @@ var vue_det = new Vue({
 <p>Это будет рядом с недавно добавленным следующим образом:</p>
 <p class="terminal">
     [{"id":"1","firstName":"Foo","lastName":"Bar"},{"id":"2","firstName":"Baz",
-                                                        "lastName":"  ...
+                                                        "lastName": ...}  ...
 
 </p>
 
