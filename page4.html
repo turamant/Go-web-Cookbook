@@ -1075,13 +1075,638 @@ func main(){
         обработчиков addEmployee, updateEmployee и deleteEmployee соответственно.</li>
 </ol>
 
-<h2>Создание вашего первого клиента AngularJS</h2>
-<p>...........................</p>
+<h2>Создание вашего первого клиента ReactJS</h2>
+<p>ReactJS — это декларативная библиотека JavaScript, которая помогает
+    эффективно создавать пользовательские интерфейсы. Поскольку он работает на основе концепции виртуального DOM, он повышает
+    производительность приложения, поскольку виртуальный DOM JavaScript работает быстрее, чем обычный DOM.
+    В этом рецепте мы научимся создавать клиент ReactJS для отправки POST-запроса на
+    HTTP-сервер, работающий локально.</p>
 
 
+<h2>Готовимся ...</h2>
+<p>Поскольку в нашем предыдущем рецепте мы уже создали HTTP-сервер, который принимает HTTP-
+    запросы GET и POST, мы будем использовать ту же базу кода, что и наш HTTP-
+    сервер.</p>
+<p>Кроме того, этот рецепт предполагает, что на вашем компьютере установлен <i>npm</i> и у вас есть базовые
+    знания о <i>npm</i> и <i>webpack</i>, который представляет собой сборщик модулей JavaScript.</p>
+
+<p class="note">
+    См. рецепт «Создание первого метода HTTP POST».
+</p>
+
+<h3>Как это сделать ...</h3>
+<ol>
+    <li>Создайте каталог responsejs-client, в котором мы будем хранить все исходные файлы ReactJS
+        и HTTP-сервер, как показано ниже:</li>
+        <p class="terminal">
+            $ mkdir reactjs-client && cd reactjs-client && touch server.go
+        </p>
+    <li>Скопируйте следующий код на server.go:</li>
+    <pre><code>
+package main
+
+import(
+    "encoding/json"
+    "log"
+    "net/http"
+    "github.com/gorilla/mux"
+)
+
+const(
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+)
+
+type Route struct{
+    Name string
+    Method string
+    Pattern string
+    HandlerFunc http.HandlerFunc
+}
+
+type Routes []Route
+
+var routes = Routes{
+    Route{
+        "getEmployees",
+        "GET",
+        "/employees",
+        getEmployees,
+    },
+    Route{
+        "addEmployee",
+        "POST",
+        "/employee/add",
+        addEmployee,
+    },
+}
+
+type Employee struct{
+    Id          string `json:"id"`
+    FirstName   string `json:"firstName"`
+    LastName    string `json:"lastName"`
+}
+
+type Employees []Employee
+
+var employees []Employee
+
+func init(){
+    employees = Employees{
+        Employee{Id: "1", FirstName: "Foo", LastName: "Bar"},
+        Employee{Id: "2", FirstName: "Baz", LastName: "Qux"},
+    }
+}
+
+func getEmployees(w http.ResponseWriter, r *http.Request){
+    json.NewEncoder(w).Encode(employees)
+}
+
+func addEmployee(w http.ResponseWriter, r *http.Request){
+    employee := Employee{}
+    err := json.NewDecoder(r.Body).Decode(&employee)
+    if err != nil{
+        log.Println("error occurred while decoding employee data: ", err)
+        return
+    }
+    log.Printf("adding employee id: %s with firstName as: %s and lastName as: %s ", employee.Id,
+                                                        employee.FirstName, employee.LastName)
+    employees = append(employees, Employee{Id: employee.Id,
+                                    FirstName: employee.FirstName, LastName: employee.LastName})
+    json.NewEncoder(w).Encode(employees)
+}
+
+func AddRoutes(router *mux.Router) *mux.Router{
+    for _, route := range routes{
+        router.Methods(route.Method).Path(route.Pattern).Name(route.Name).Handler(route.HandlerFunc)
+    }
+    return router
+}
+
+func main(){
+    muxRouter := mux.NewRouter().StrictSlash(true)
+    router := AddRoutes(muxRouter)
+    router.PathPrefix("/").Handler(http.FileServer(http.Dir("./assets/")))
+    
+    err := http.ListenAndServe(CONN_HOST + ":" + CONN_PORT, router)
+    if err != nil{
+        log.Fatal("error starting http server: ", err)
+        return
+    }
+}
+    </code></pre>
+    <li>Создайте еще один каталог с именем assets, в котором
+        будут храниться все файлы кода нашего внешнего интерфейса, такие как .html, .js, .css и изображения, следующим образом:</li>
+        <p class="terminal">
+            $ mkdir assets && cd assets && touch index.html
+        </p>
+    <li>Скопируйте следующее содержимое в index.html:</li>
+    <pre><code>
+&lt;html&gt;
+    &lt;head lang="en"&gt;
+        &lt;meta charset="UTF-8" /&gt;
+        &lt;title&gt;ReactJS Client&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;div id="react"&gt;&lt;/div&gt;
+        &lt;script src="/script.js"&gt;&lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+    </code></pre>
+    <li>Перейдите в каталог responsejs-client и выполните <i>npm init</i>, чтобы создать package.json,
+        где мы указываем все зависимости, необходимые для создания нашего React клиента, такие как
+        React, React DOM, Webpack, Babel Loader, Babel Core, Babel Preset: ES2015 и Babel.
+        Предустановка: React следующим образом:</li>
+        <p class="terminal">
+            $ cd responsejs-client && touch npm init
+        </p>
+        <p>Замените содержимое package.json следующим содержимым:</p>
+        <pre><code>
+            {
+                "name": "reactjs-client",
+                "version": "1.0.0",
+                "description": "ReactJs Client",
+                "keywords":
+                [
+                    "react"
+                ],
+                "author": "Arpit Aggarwal",
+                "dependencies":
+                {
+                    "axios": "^0.18.0",
+                    "react": "^16.2.0",
+                    "react-dom": "^16.2.0",
+                    "react-router-dom": "^4.2.2",
+                    "webpack": "^4.2.0",
+                    "webpack-cli": "^2.0.9",
+                    "lodash": "^4.17.5"
+                },
+                "scripts":
+                {
+                    "build": "webpack",
+                    "watch": "webpack --watch -d"
+                },
+                "devDependencies":
+                {
+                    "babel-core": "^6.18.2",
+                    "babel-loader": "^7.1.4",
+                    "babel-polyfill": "^6.16.0",
+                    "babel-preset-es2015": "^6.18.0",
+                    "babel-preset-react": "^6.16.0"
+                }
+            }
+        </code></pre>
+    <li>Создайте webpack.config.js, где мы будем настраивать веб-пакет следующим образом:</li>
+    <p class="terminal">
+        $ cd reactjs-client && touch webpack.config.js
+    </p>
+    <p>Скопируйте следующее содержимое в webpack.config.js:</p>
+    <pre><code>
+    var path = require('path');
+    module.exports = {
+                           resolve:
+                        {
+                            extensions: ['.js', '.jsx']
+                        },
+                        mode: 'development',
+                        entry: './app/main.js',
+                        cache: true,
+                        output:
+                        {
+                            path: __dirname,
+                            filename: './assets/script.js'
+                        },
+                        module:
+                        {
+                            rules:
+                        [
+                        {
+                            test: path.join(__dirname, '.'),
+                            exclude: /(node_modules)/,
+                            loader: 'babel-loader',
+                            query:
+                        {
+                            cacheDirectory: true,
+                            presets: ['es2015', 'react']
+                        }
+                        }
+                        ]
+                        }
+                    };
+    </code></pre>
+    <li>Создайте точку входа для веб-пакета (reactjs-client/app/main.js), выполнив
+        следующие команды:</li>
+        <p class="terminal">
+            $ cd actjs-client && mkdir app && cd app && touch main.js
+        </p>
+        <p>Скопируйте следующее содержимое в main.js:</p>
+        <pre><code>
+            'use strict';
+            const React = require('react');
+            const ReactDOM = require('react-dom')
+            import EmployeeApp from './components/employee-app.jsx'
+            ReactDOM.render
+            (
+                &lt;EmployeeApp /&gt;,
+            document.getElementById('react')
+            )   
+        </code></pre>
+        <li>Определите ReactApp вместе с его дочерними компонентами, выполнив следующие
+            команды:</li>
+            <p class="terminal">
+                $ cd reactjs-client && mkdir components && cd components && touch react-app.jsx
+            </p>
+            <p>Скопируйте следующее содержимое в responsejs-client/app/comComponents/employee-app.jsx:</p>
+            <pre><code>
+                'use strict';
+                const React = require('react');
+                var axios = require('axios');
+                import EmployeeList from './employee-list.jsx'
+                import AddEmployee from './add-employee.jsx'
+                export default class EmployeeApp extends React.Component
+                {
+                    constructor(props)
+                {
+                super(props);
+                this.state = {employees: []};
+                this.addEmployee = this.addEmployee.bind(this);
+                this.Axios = axios.create
+                (
+                {
+                headers: {'content-type': 'application/json'}
+                }
+                );
+                }
+                componentDidMount()
+                {
+                let _this = this;
+                this.Axios.get('/employees')
+                .then
+                (
+                function (response)
+                {
+                _this.setState({employees: response.data});
+                }
+                )
+                .catch(function (error) { });
+                }
+                addEmployee(employeeName)
+                {
+                let _this = this;
+                this.Axios.post
+                (
+                '/employee/add',
+                {
+                firstName: employeeName
+                }
+                )
+                .then
+                (
+                function (response)
+                {
+                _this.setState({employees: response.data});
+                }
+                )
+                .catch(function (error) { });
+                }
+                render()
+                {
+                return
+                (
+                &lt;div&gt;
+                &lt;AddEmployee addEmployee={this.addEmployee}/&gt;
+                &lt;EmployeeList employees={this.state.employees}/&gt;
+                &lt;/div&gt;
+                )
+                }
+                }
+            </code></pre>
+            <p>Скопируйте следующее содержимое в responsejs-client/app/comComponents/employee.jsx:</p>
+            <pre><code>
+                const React = require('react');
+                export default class Employee extends React.Component
+                {
+                    render()
+                        {
+                            return (
+                                &lt;tr&gt;
+                                &lt;td&gt;{this.props.employee.firstName}&lt;/td&gt;
+                                &lt;/tr&gt;
+                            )
+                    }
+                }
+            </code></pre>
+            <p>Скопируйте следующее содержимое в responsejs-client/app/comComponents/employee-list.jsx:</p>
+            <pre><code>
+                const React = require('react');
+import Employee from './employee.jsx'
+export default class EmployeeList extends React.Component
+{
+render()
+{
+var employees = this.props.employees.map
+(
+(employee, i) =&gt;
+&lt;Employee key={i} employee={employee}/&gt;
+);
+return
+(
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;th&gt;FirstName&lt;/th&gt;
+&lt;/tr&gt;
+{employees}
+&lt;/tbody&gt;
+&lt;/table&gt;
+)
+}
+}
+            </code></pre>
+            <p>Скопируйте следующее содержимое в responsejs-client/app/comComponents/add-employee.jsx:</p>
+            <pre><code>
+                import React, { Component, PropTypes } from 'react'
+export default class AddEmployee extends React.Component
+{
+render()
+{
+return
+(
+<div>
+<input type = 'text' ref = 'input' />
+<button onClick = {(e) => this.handleClick(e)}>
+Add
+</button>
+</div>
+)
+}
+handleClick(e)
+{
+const node = this.refs.input
+const text = node.value.trim()
+this.props.addEmployee(text)
+node.value = ''
+}
+}
+            </code></pre>
+            <p>Если все готово, структура каталогов должна выглядеть следующим образом:</p>
+        <p><img src="static/images/picture4-6.png"/></p>
+        <li>Перейдите в каталог реакции js-client и выполните следующие команды для установки
+            модулей узла и сборки веб-пакета:</li>
+            <p class="terminal">
+                $ npm install
+                $ npm run build
+            </p>
+        <li>Запустите программу с помощью следующей команды:
+            </li>
+            <p class="terminal">
+                $ go run server.go
+            </p>
+</ol>
+
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>При переходе по адресу http://localhost:8080 мы отобразим страницу клиента ReactJS, как показано на следующем
+    снимке экрана:</p>
+    <p><img src="static/images/picture4-7.png"/></p>
+<p>Нажатие кнопки «Добавить» после заполнения текстового поля отправит POST-запрос на
+    HTTP-сервер, работающий на порту 8080:</p>
+    <p><img src="static/images/picture4-8.png"/></p>
+
+<p>Затем, выполнив запрос GET из командной строки следующим образом, вы получите список
+    всех статических сотрудников:</p>
+<p class="terminal">
+    $ curl -X GET http://localhost:8080/employees
+
+</p>
+<p>Это будет рядом с недавно добавленным, а именно:</p>
+<p class="terminal">
+    [{"id":"1","firstName":"Foo","lastName":"Bar"},{"id":"2","firstName":"Baz",
+                                                                    "lastName":" ...
+
+</p>
+
+<h2>Создание вашего первого клиента VueJS.</h2>
+<p>VueJS с открытым исходным кодом является одной из постепенно адаптируемых и прогрессивных
+    инфраструктур JavaScript, которые компании применяют для создания своих интерфейсов или клиентских пользовательских интерфейсов для Интернета.</p>
+<p>В этом рецепте мы научимся создавать клиент на VueJS, который добавляет сотрудника,
+    отправляющего запрос HTTP POST на HTTP-сервер, работающий локально.</p>
+
+<h3>Готовимся ...</h3>
+<p>Поскольку в одном из предыдущих рецептов мы уже создали HTTP-сервер, который принимает запросы GET и POST
+    , мы будем использовать ту же базу кода, что и наш HTTP-сервер.</p>
+
+<p class="note">
+    См. рецепт «Создание первого метода HTTP POST».
+</p>
+
+<h3>Как это сделать ...</h3>
+<ol>
+    <li>Создайте каталог vuejs-client, в котором мы будем хранить все исходные файлы VueJS и
+        HTTP-сервер, следующим образом:</li>
+        <p class="terminal">
+            $ mkdir vuejs-client && cd vuejs-client && touch server.go
+        </p>
+    <li>Скопируйте следующий код на server.go:</li>
+    <pre><code>
+package main
+
+import(
+    "encoding/json"
+    "log"
+    "net/http"
+    "github.com/gorilla/mux"
+)
+
+const(
+    CONN_HOST = "localhost"
+    CONN_PORT = "8080"
+)
+
+type Route struct{
+    Name string
+    Method string
+    Pattern string
+    HandlerFunc http.HandlerFunc
+}
+
+type Routes []Route
+
+var routes = Routes{
+    Route{
+        "getEmployees",
+        "GET",
+        "/employees",
+        getEmployees,
+    },
+    Route{
+        "addEmployee",
+        "POST",
+        "/employee/add",
+        addEmployee,
+    },
+}
+
+type Employee struct{
+    Id          string `json:"id"`
+    FirstName   string `json:"firstName"`
+    LastName    string `json:"lastName"`
+}
+
+type Employees []Employee
+
+var employees []Employee
+
+func init(){
+    employees = Employees{
+        Employee{Id: "1", FirstName: "Foo", LastName: "Bar"},
+        Employee{Id: "2", FirstName: "Baz", LastName: "Qux"},
+    }
+}
+
+func getEmployees(w http.ResponseWriter, r *http.Request){
+    json.NewEncoder(w).Encode(employees)
+}
+
+func addEmployee(w http.ResponseWriter, r *http.Request){
+    employee := Employee{}
+    err := json.NewDecoder(r.Body).Decode(&employee)
+    if err != nil{
+        log.Print("error occurred while decoding employee data: ", err)
+        return
+    }
+    log.Printf("adding employee id: %s with firstName as : %s and lastName as : %s ", employee.Id,
+                                                            employee.FirstName, employee.LastName)
+    employees = append(employees, Employee{Id: employee.Id,
+                                    FirstName: employee.FirstName, LastName: employee.LastName})
+    json.NewEncoder(w).Encode(employees)
+}
+
+func AddRoutes(router *mux.Router) *mux.Router{
+    for _, route := range routes{
+        router.Methods(route.Method).Path(route.Pattern).Name(route.Name).Handler(route.HandlerFunc)
+    }
+    return router
+}
+
+func main(){
+    muxRouter := mux.NewRouter().StrictSlash(true)
+    router := AddRoutes(muxRouter)
+    router.PathPrefix("/").Handler(http.FileServer(http.Dir("./assets/")))
+
+    err := http.ListenAndServe(CONN_HOST+":"+CONN_PORT, router)
+    if err != nil{
+        log.Fatal("error starting http server: ", err)
+        return
+    }
+}
+    </code></pre>
+    <li>Создайте еще один каталог с именем assets, в котором
+        будут храниться все файлы кода нашего внешнего интерфейса, такие как .html, .js, .css и изображения, следующим образом:</li>
+    <p class="terminal">
+        $ mkdir assets && cd assets && touch index.html && touch main.js
+    </p>
+    <li>Скопируйте следующее содержимое в index.html:</li>
+    <pre><code>
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;VueJs Client&lt;/title&gt;
+        &lt;script type = "text/javascript" src = "https://cdnjs.
+                    cloudflare.com/ajax/libs/vue/2.4.0/vue.js"&gt;&lt;/script&gt;
+        &lt;script type = "text/javascript" src="https://cdn.
+                            jsdelivr.net/npm/vue-resource@1.5.0"&gt;&lt;/script&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;div id = "form"&gt;
+        &lt;h1&gt;{{ message }}&lt;/h1&gt;
+        &lt;table&gt;
+            &lt;tr&gt;
+                &lt;td&gt;&lt;label for="id"&gt;Id&lt;/label&gt;&lt;/td&gt;
+                &lt;td&gt;&lt;input type="text" value="" v-model="id"/&gt;&lt;/td&gt;
+            &lt;/tr&gt;
+            &lt;tr&gt;
+                &lt;td&gt;&lt;label for="firstName"&gt;FirstName&lt;/label&gt;&lt;/td&gt;
+                &lt;td&gt;&lt;input type="text" value="" v-model="firstName"/&gt;
+                &lt;td&gt;
+            &lt;/tr&gt;
+            &lt;tr&gt;
+                &lt;td&gt;&lt;label for="lastName"&gt;LastName&lt;/label&gt;&lt;/td&gt;
+                &lt;td&gt; &lt;input type="text" value="" v-model="lastName" /&gt;
+                &lt;/td&gt;
+            &lt;/tr&gt;
+            &lt;tr&gt;
+                &lt;td&gt;&lt;a href="#" class="btn" @click="addEmployee"&gt;Add
+                &lt;/a&gt;&lt;/td&gt;
+            &lt;/tr&gt;
+        &lt;/table&gt;
+        &lt;/div&gt;
+        &lt;script type = "text/javascript" src = "main.js"&gt;&lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+    </code></pre>
+    <li>Скопируйте следующее содержимое в main.js:</li>
+    <pre><code>
+var vue_det = new Vue({
+    el: '#form',
+    data:{
+        message: 'Employee Dashboard',
+        id: '',
+        firstName:'',
+        lastName:''
+    },
+    methods:{
+        addEmployee: function(){
+            this.$http.post(
+                '/employee/add',
+                {
+                id: this.id,
+                firstName:this.firstName,
+                lastName:this.lastName
+                }
+            )
+            .then(
+                response =>{
+                    console.log(response);
+                },
+                error =>{
+                    console.error(error);
+                }
+            );
+        }
+    }
+});
+    </code></pre>
+    <p>Если все готово, структура каталогов должна выглядеть следующим образом:</p>
+    <p><img src="static/images/picture4-9.png"/></p>
+    <li>Запустите программу следующей командой:</li>
+    <p class="terminal">
+        $ go run server.go
+    </p>
+</ol>
 
 
+<h3>Как это работает ...</h3>
+<p>Как только мы запустим программу, HTTP-сервер начнет локально прослушивать порт 8080.</p>
+<p>При переходе по адресу http://localhost:8080 мы отобразим клиентскую страницу VueJS, которая имеет
+    HTML-форму с полями Id, FirstName и LastName, как показано на рисунке. на следующем
+    скриншоте:</p>
+    <p><img src="static/images/picture4-10.png"/></p>
+<p>Нажатие кнопки «Добавить» после заполнения формы отправит POST-запрос на
+    HTTP-сервер, работающий на порту 8080, как показано на следующем снимке экрана:</p>
+    <p><img src="static/images/picture4-11.png"/></p>
 
+<p>Затем, выполнив запрос GET из командной строки следующим образом, вы получите список
+    всех статических сотрудников:</p>
+<p class="terminal">
+    $ curl -X GET http://localhost:8080/employees
+
+</p>
+<p>Это будет рядом с недавно добавленным следующим образом:</p>
+<p class="terminal">
+    [{"id":"1","firstName":"Foo","lastName":"Bar"},{"id":"2","firstName":"Baz",
+                                                        "lastName":"  ...
+
+</p>
 
 </body>
 </html>
